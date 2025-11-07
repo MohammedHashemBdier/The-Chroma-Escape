@@ -1,5 +1,5 @@
 from model import GameState, MovementType, Block, Board
-
+import json
 class GameLogic:
     
     def get_possible_moves(self, current_state: GameState) -> list:
@@ -125,4 +125,58 @@ class GameLogic:
         
         return GameState(board=current_state.board, blocks=new_blocks)
     
-    
+
+    def load_game_state(file_path: str) -> GameState:
+
+        try:
+            with open(file_path, 'r') as f:
+                data = json.load(f)
+        except FileNotFoundError:
+            print(f"Error: File not found at {file_path}")
+            return None
+        except json.JSONDecodeError:
+            print(f"Error: Invalid JSON format in {file_path}")
+            return None
+            
+        exits_dict = {
+            (exit_data['x'], exit_data['y']): exit_data['color']
+            for exit_data in data.get('exits', [])
+        }
+
+        barriers_set = {
+            (barrier_data['x'], barrier_data['y'])
+            for barrier_data in data.get('barriers', [])
+        }
+        
+        board = Board(
+            width=data['board_width'],
+            height=data['board_height'],
+            exits=exits_dict,
+            barriers=barriers_set
+        )
+        
+        blocks_list = []
+        
+        movement_map = {
+            "HORIZONTAL": MovementType.HORIZONTAL,
+            "VERTICAL": MovementType.VERTICAL,
+            "ANY": MovementType.ANY
+        }
+        
+        for block_data in data['blocks']:
+            move_type = movement_map.get(block_data.get('movement_type'))
+            if not move_type:
+                raise ValueError(f"Invalid movement type: {block_data.get('movement_type')}")
+                
+            block = Block(
+                color=block_data['color'],
+                x=block_data['x'],
+                y=block_data['y'],
+                shape=[tuple(s) for s in block_data['shape']], 
+                movement_type=move_type
+            )
+            blocks_list.append(block)
+
+        start_state = GameState(board=board, blocks=blocks_list)
+        
+        return start_state
