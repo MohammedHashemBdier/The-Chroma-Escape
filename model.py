@@ -56,4 +56,18 @@ class GameState:
         for block in self.blocks:
             positions.append((block.x, block.y))
         return tuple(sorted(positions))
-    
+
+    def __eq__(self, other):
+        if not isinstance(other, GameState):
+            return False
+
+        return self.get_hashable_key() == other.get_hashable_key()
+
+    def __hash__(self):
+        
+        return hash(self.get_hashable_key())
+
+    def get_hashable_key(self) -> tuple:
+        positions_list = [(block.y, block.x, block.color) for block in self.blocks]
+        
+        return tuple(sorted(positions_list))
