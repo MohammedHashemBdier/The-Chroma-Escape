@@ -63,3 +63,66 @@ class GameLogic:
                     
 
         return possible_next_states
+
+    def _is_exit_move_valid(self, new_coords: set, block: Block, board: Board) -> bool:
+        
+        in_bounds_coords = set()
+        out_of_bounds_coords = set()
+        
+        for x, y in new_coords:
+            if 0 <= x < board.width and 0 <= y < board.height:
+                in_bounds_coords.add((x, y))
+            else:
+                out_of_bounds_coords.add((x, y))
+
+        if not out_of_bounds_coords:
+            return False 
+
+        if in_bounds_coords:
+            return False
+
+        for x_out, y_out in out_of_bounds_coords:
+            exit_color = board.get_exit_color(x_out, y_out)
+            
+            if exit_color is None:
+                return False
+                
+            if exit_color != block.color:
+                return False
+                
+        return True
+
+    def _is_collision(self, new_coords: set, current_state: GameState, moving_block_index: int) -> bool:
+        board = current_state.board
+        
+        obstacle_coords = board.barriers.copy()
+        
+        for i, block in enumerate(current_state.blocks):
+            if i != moving_block_index:
+                obstacle_coords.update(block.get_absolute_coords())
+        
+        if new_coords & obstacle_coords:
+            return True 
+            
+        for x, y in new_coords:
+            if not (0 <= x < board.width and 0 <= y < board.height):
+                if board.get_exit_color(x, y) is None:
+                    return True 
+                
+        return False
+
+    def _create_new_state_after_move(self, current_state: GameState, block_index: int, moved_block: Block) -> GameState:
+        new_blocks = current_state.blocks[:]
+        
+        new_blocks[block_index] = moved_block
+        
+        return GameState(board=current_state.board, blocks=new_blocks)
+    
+    def _create_new_state_after_exit(self, current_state: GameState, block_index: int) -> GameState:
+        new_blocks = current_state.blocks[:]
+        
+        new_blocks.pop(block_index)
+        
+        return GameState(board=current_state.board, blocks=new_blocks)
+    
+    

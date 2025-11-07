@@ -1,0 +1,28 @@
+{
+    "board_width": 6,
+    "board_height": 6,
+    "exits": [
+        {"x": 5, "y": 3, "color": "red"},
+        {"x": 0, "y": 2, "color": "blue"}
+    ],
+    "barriers": [
+        {"x": 1, "y": 1},
+        {"x": 4, "y": 4}
+    ],
+    "blocks": [
+        {
+            "color": "red",
+            "x": 4,
+            "y": 3,
+            "movement_type": "HORIZONTAL",
+            "shape": [[0, 0], [-1, 0]]
+        },
+        {
+            "color": "yellow",
+            "x": 2,
+            "y": 5,
+            "movement_type": "VERTICAL",
+            "shape": [[0, 0]]
+        }
+    ]
+}
