@@ -8,12 +8,17 @@ LEVEL_FILE = "levels/level_01.json"
 def run_game():
     
     current_state = load_game_state(LEVEL_FILE)
+    
     if current_state is None:
-        print("Failed to load game state. Exiting.")
+        print("Error: Failed to load game state from JSON. Check file path or content.")
         return
 
     logic = GameLogic()
     
+    if current_state.board.width <= 0 or current_state.board.height <= 0:
+        print(f"Error: Invalid board dimensions ({current_state.board.width}x{current_state.board.height}).")
+        return
+        
     viz = GameVisualizer(current_state.board.width, current_state.board.height)
 
     running = True
@@ -50,12 +55,27 @@ def run_game():
                     mouse_x, mouse_y = event.pos
                     cell_x_end = mouse_x // CELL_SIZE
                     cell_y_end = mouse_y // CELL_SIZE
-                    drag_end_cell = (cell_x_end, cell_y_end)
                     
-                    dx = cell_x_end - drag_start_cell[0]
-                    dy = cell_y_end - drag_start_cell[1]
+                    total_dx = cell_x_end - drag_start_cell[0]
+                    total_dy = cell_y_end - drag_start_cell[1]
+
+                    direction_vector = (0, 0)
+                    distance = 0
                     
-                    current_state = logic.try_move(current_state, selected_block_index, dx, dy)
+                    if abs(total_dx) > abs(total_dy):
+                        direction_vector = (1 if total_dx > 0 else -1, 0)
+                        distance = abs(total_dx)
+                    elif abs(total_dy) > 0:
+                        direction_vector = (0, 1 if total_dy > 0 else -1)
+                        distance = abs(abs(total_dy))
+                    
+                    if distance > 0:
+                        current_state = logic.try_move_manual(
+                            current_state, 
+                            selected_block_index, 
+                            direction_vector, 
+                            distance
+                        )
 
                 selected_block_index = None
                 drag_start_cell = None

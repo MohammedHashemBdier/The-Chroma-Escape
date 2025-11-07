@@ -39,7 +39,7 @@ class Board:
 class GameState:
     def __init__(self, board: Board, blocks: list):
         self.board = board
-        self.blocks = blocks
+        self.blocks = blocks 
 
     def check_win_condition(self) -> bool:
         return len(self.blocks) == 0
@@ -50,13 +50,6 @@ class GameState:
             occupied.update(block.get_absolute_coords())
         return occupied
     
-
-    def get_hashable_state(self) -> tuple:
-        positions = []
-        for block in self.blocks:
-            positions.append((block.x, block.y))
-        return tuple(sorted(positions))
-
     def __eq__(self, other):
         if not isinstance(other, GameState):
             return False
@@ -64,7 +57,6 @@ class GameState:
         return self.get_hashable_key() == other.get_hashable_key()
 
     def __hash__(self):
-        
         return hash(self.get_hashable_key())
 
     def get_hashable_key(self) -> tuple:
