@@ -1,4 +1,6 @@
 from enum import Enum
+from typing import Union
+
 class MovementType(Enum):
     HORIZONTAL = 1
     VERTICAL = 2
@@ -20,3 +22,16 @@ class Block:
 
     def __repr__(self):
         return f"Block(Color: {self.color}, Pos: ({self.x}, {self.y}), Type: {self.movement_type.name})"
+    
+class Board:
+    def __init__(self, width: int, height: int, exits: dict, barriers: set):
+        self.width = width
+        self.height = height
+        self.exits = exits
+        self.barriers = barriers
+
+    def is_valid_coordinate(self, x: int, y: int) -> bool:
+        return 0 <= x < self.width and 0 <= y < self.height and (x, y) not in self.barriers
+
+    def get_exit_color(self, x: int, y: int) -> Union[str, None]:
+        return self.exits.get((x, y))
