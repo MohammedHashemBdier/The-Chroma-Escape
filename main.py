@@ -1,5 +1,5 @@
 import pygame
-from controller import load_game_state, GameLogic
+from controller import GameLogic, load_game_state
 from view import GameVisualizer, CELL_SIZE
 
 LEVEL_FILE = "levels/level_01.json" 
