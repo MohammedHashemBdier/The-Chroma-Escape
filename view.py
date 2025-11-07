@@ -64,7 +64,6 @@ class GameVisualizer:
 
     
     def _draw_grid(self, exits: dict):
-        # 1. رسم خطوط الشبكة الداخلية
         for x in range(self.width + 1):
             x_pos = x * CELL_SIZE
             pygame.draw.line(self.screen, GRID_LINE_COLOR, (x_pos, 0), (x_pos, self.screen_height), 1)
@@ -73,44 +72,56 @@ class GameVisualizer:
             y_pos = y * CELL_SIZE
             pygame.draw.line(self.screen, GRID_LINE_COLOR, (0, y_pos), (self.screen_width, y_pos), 1)
 
-        # 2. رسم الإطار الخارجي
         border_thickness = 4
         border_color = (50, 50, 50)
         
         pygame.draw.rect(self.screen, border_color, (0, 0, self.screen_width, self.screen_height), border_thickness)
 
-        # 3. رسم المنافذ الملونة
         exit_thickness = 8 
         
         for (x, y), color_name in exits.items():
             color = COLOR_MAP.get(color_name.lower(), (200, 200, 200))
             
-            # بما أننا نستخدم الآن الإحداثيات الداخلية (مثل x=0 أو x=self.width - 1)
-            # يجب أن تكون الشروط كما يلي:
-            
-            # المنفذ الأيسر (الإحداثي الداخلي x=0)
             if x == 0:
                 start_pos = (0, y * CELL_SIZE)
                 end_pos = (0, (y + 1) * CELL_SIZE)
                 pygame.draw.line(self.screen, color, start_pos, end_pos, exit_thickness)
             
-            # المنفذ الأيمن (الإحداثي الداخلي x=self.width - 1)
             elif x == self.width - 1:
                 start_pos = (self.screen_width, y * CELL_SIZE)
                 end_pos = (self.screen_width, (y + 1) * CELL_SIZE)
                 pygame.draw.line(self.screen, color, start_pos, end_pos, exit_thickness)
 
-            # المنفذ العلوي (الإحداثي الداخلي y=0)
             elif y == 0:
                 start_pos = (x * CELL_SIZE, 0)
                 end_pos = ((x + 1) * CELL_SIZE, 0)
                 pygame.draw.line(self.screen, color, start_pos, end_pos, exit_thickness)
 
-            # المنفذ السفلي (الإحداثي الداخلي y=self.height - 1)
             elif y == self.height - 1:
                 start_pos = (x * CELL_SIZE, self.screen_height)
                 end_pos = ((x + 1) * CELL_SIZE, self.screen_height)
                 pygame.draw.line(self.screen, color, start_pos, end_pos, exit_thickness)
+
+    
+    def draw_win_screen(self):
+        
+        WIN_COLOR = (124, 252, 0)
+        TEXT_COLOR = (0, 0, 0)
+        
+        self.screen.fill(WIN_COLOR)
+        
+        try:
+            font = pygame.font.Font(None, 74) 
+        except pygame.error:
+            font = pygame.font.SysFont(None, 74)
+
+        text = font.render("PUZZLE SOLVED!", True, TEXT_COLOR)
+        
+        text_rect = text.get_rect(center=(self.screen_width // 2, self.screen_height // 2))
+        
+        self.screen.blit(text, text_rect)
+        
+        pygame.display.flip()
 
     
     def draw(self, state: GameState, selected_block_coords: set = None):

@@ -38,10 +38,8 @@ class GameLogic:
                 is_out_of_bounds = not (0 <= x < board.width and 0 <= y < board.height)
                 exit_color = board.get_exit_color(x, y)
                 
-                # السماح بعبور المنفذ إذا كانت القطعة ستخرج بالكامل
                 if is_out_of_bounds:
                     if exit_color is None or exit_color.lower() != block.color.lower():
-                        # يجب أن تكون الحركة التالية هي الخروج، وليس مجرد الخروج من الحدود
                         return False 
                 
         return True
@@ -73,11 +71,9 @@ class GameLogic:
         )
         final_coords = set(moved_block.get_absolute_coords())
 
-        # المنطق الجديد للتحقق من ملامسة الحد الداخلي (x=5)
         if self._is_exit_move_valid(final_coords, block, board):
             return self._create_new_state_after_exit(current_state, block_index)
 
-        # التحقق من أن الحركة داخل الحدود (لعدم السماح بالحركة خارجاً ما لم تُفعل دالة الخروج)
         for x, y in final_coords:
             if not (0 <= x < board.width and 0 <= y < board.height):
                 return current_state 
@@ -110,7 +106,6 @@ class GameLogic:
                     if not self._is_path_clear(current_state, block_index, dx, dy, distance):
                         break
                     
-                    # التحقق من ملامسة الحد الداخلي
                     if self._is_exit_move_valid(final_coords, block, board):
                         new_state = self._create_new_state_after_exit(current_state, block_index)
                         possible_next_states.append(new_state)
@@ -119,7 +114,6 @@ class GameLogic:
                     if not self._is_collision(final_coords, current_state, block_index):
                         new_state = self._create_new_state_after_move(current_state, block_index, moved_block)
                         
-                        # منع إضافة الحالات التي تخرج خارج الحدود إذا لم تكن منفذاً
                         is_out_of_bounds = False
                         for x_coord, y_coord in final_coords:
                             if not (0 <= x_coord < board.width and 0 <= y_coord < board.height):
@@ -133,16 +127,12 @@ class GameLogic:
 
         return possible_next_states
 
-    # الوظيفة التي تم تعديلها: تتحقق من ملامسة المنفذ الداخلي
     def _is_exit_move_valid(self, new_coords: set, block: Block, board: Board) -> bool:
         
-        # نتحقق مما إذا كانت أي خلية من القطعة الجديدة تشغل إحداثي منفذ
         for x, y in new_coords:
             exit_color = board.get_exit_color(x, y)
             
-            # بما أن JSON يستخدم الآن الإحداثيات الداخلية (x=5)
             if exit_color is not None and exit_color.lower() == block.color.lower():
-                # القطعة مُلاصقة للحد الداخلي للمنفذ. يتم تفعيل الحذف.
                 return True
             
         return False
@@ -159,12 +149,10 @@ class GameLogic:
         if new_coords.intersection(obstacle_coords):
             return True 
             
-        # التحقق من خروج أي خلية خارج الحدود (باستثناء المنافذ)
         for x, y in new_coords:
             if not (0 <= x < board.width and 0 <= y < board.height):
                 exit_color = board.get_exit_color(x, y)
                 if exit_color is None or exit_color.lower() != current_state.blocks[moving_block_index].color.lower():
-                    # إذا كانت الحركة خارج الحدود و ليست لمنفذ، تعتبر تصادماً
                     return True 
                 
         return False

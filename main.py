@@ -30,7 +30,7 @@ def run_game():
         
         if current_state.check_win_condition():
             print("Congratulations! You solved the puzzle!")
-            viz.draw(current_state)
+            viz.draw_win_screen()
             viz.wait_for_quit()
             break
 
