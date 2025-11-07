@@ -35,3 +35,19 @@ class Board:
 
     def get_exit_color(self, x: int, y: int) -> Union[str, None]:
         return self.exits.get((x, y))
+
+class GameState:
+    def __init__(self, board: Board, blocks: list):
+        self.board = board
+        self.blocks = blocks
+
+    def check_win_condition(self) -> bool:
+        # إذا كانت قائمة القطع (self.blocks) فارغة، فهذا يعني أن جميع القطع قد خرجت.
+        return len(self.blocks) == 0
+
+    def get_occupied_coords(self) -> set:
+        occupied = set()
+        for block in self.blocks:
+            occupied.update(block.get_absolute_coords())
+        return occupied
+    
