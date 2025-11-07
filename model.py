@@ -42,7 +42,6 @@ class GameState:
         self.blocks = blocks
 
     def check_win_condition(self) -> bool:
-        # إذا كانت قائمة القطع (self.blocks) فارغة، فهذا يعني أن جميع القطع قد خرجت.
         return len(self.blocks) == 0
 
     def get_occupied_coords(self) -> set:
@@ -50,4 +49,11 @@ class GameState:
         for block in self.blocks:
             occupied.update(block.get_absolute_coords())
         return occupied
+    
+
+    def get_hashable_state(self) -> tuple:
+        positions = []
+        for block in self.blocks:
+            positions.append((block.x, block.y))
+        return tuple(sorted(positions))
     
