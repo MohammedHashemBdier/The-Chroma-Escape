@@ -11,3 +11,9 @@ class Block:
         self.y = y
         self.shape = shape
         self.movement_type = movement_type
+
+    def get_absolute_coords(self) -> list:
+        absolute_coords = []
+        for dx, dy in self.shape:
+            absolute_coords.append((self.x + dx, self.y + dy))
+        return absolute_coords
