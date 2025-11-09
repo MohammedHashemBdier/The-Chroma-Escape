@@ -2,7 +2,7 @@ import pygame
 from controller import GameLogic, load_game_state
 from view import GameVisualizer, CELL_SIZE
 
-LEVEL_FILE = "levels/level_01.json" 
+LEVEL_FILE = "levels/level_02.json" 
 
 
 def run_game():

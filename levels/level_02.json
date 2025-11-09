@@ -1,0 +1,126 @@
+{
+  "board_width": 6,
+  "board_height": 6,
+  "exits": [
+    {
+      "x": 5,
+      "y": 2,
+      "color": "red"
+    }
+  ],
+  "barriers": [],
+  "blocks": [
+    {
+      "color": "red",
+      "x": 1,
+      "y": 2,
+      "movement_type": "HORIZONTAL",
+      "shape": [
+        [0, 0],
+        [1, 0]
+      ]
+    },
+    {
+      "color": "blue",
+      "x": 0,
+      "y": 0,
+      "movement_type": "VERTICAL",
+      "shape": [
+        [0, 0],
+        [0, 1]
+      ]
+    },
+    {
+      "color": "yellow",
+      "x": 2,
+      "y": 0,
+      "movement_type": "HORIZONTAL",
+      "shape": [
+        [0, 0],
+        [1, 0],
+        [2, 0]
+      ]
+    },
+    {
+      "color": "green",
+      "x": 5,
+      "y": 0,
+      "movement_type": "VERTICAL",
+      "shape": [
+        [0, 0],
+        [0, 1]
+      ]
+    },
+    {
+      "color": "purple",
+      "x": 1,
+      "y": 1,
+      "movement_type": "VERTICAL",
+      "shape": [
+        [0, 0],
+        [0, 1]
+      ]
+    },
+    {
+      "color": "orange",
+      "x": 3,
+      "y": 1,
+      "movement_type": "VERTICAL",
+      "shape": [
+        [0, 0],
+        [0, 1]
+      ]
+    },
+    {
+      "color": "cyan",
+      "x": 0,
+      "y": 3,
+      "movement_type": "HORIZONTAL",
+      "shape": [
+        [0, 0],
+        [1, 0]
+      ]
+    },
+    {
+      "color": "magenta",
+      "x": 3,
+      "y": 3,
+      "movement_type": "VERTICAL",
+      "shape": [
+        [0, 0],
+        [0, 1]
+      ]
+    },
+    {
+      "color": "lime",
+      "x": 4,
+      "y": 4,
+      "movement_type": "HORIZONTAL",
+      "shape": [
+        [0, 0],
+        [1, 0]
+      ]
+    },
+    {
+      "color": "brown",
+      "x": 0,
+      "y": 5,
+      "movement_type": "HORIZONTAL",
+      "shape": [
+        [0, 0],
+        [1, 0],
+        [2, 0]
+      ]
+    },
+    {
+      "color": "pink",
+      "x": 4,
+      "y": 5,
+      "movement_type": "VERTICAL",
+      "shape": [
+        [0, 0],
+        [0, 1]
+      ]
+    }
+  ]
+}
