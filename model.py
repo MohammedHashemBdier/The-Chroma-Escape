@@ -1,7 +1,6 @@
 from enum import Enum
 from typing import Union, List, Tuple, Set, Optional
 import copy
-import time
 
 class MovementType(Enum):
     HORIZONTAL = 1
@@ -16,9 +15,6 @@ class Block:
         self.shape = shape
         self.movement_type = movement_type
         self.id = id  # إضافة معرف فريد للقطعة
-        self.animation_progress = 0  # للرسوم المتحركة
-        self.target_x = x
-        self.target_y = y
 
     def get_absolute_coords(self) -> List[Tuple[int, int]]:
         absolute_coords = []
@@ -44,25 +40,7 @@ class Block:
         new_block = copy.deepcopy(self)
         new_block.x += dx * distance
         new_block.y += dy * distance
-        new_block.target_x = new_block.x
-        new_block.target_y = new_block.y
         return new_block
-
-    def start_animation(self, target_x: int, target_y: int):
-        """بدء الرسوم المتحركة للقطعة"""
-        self.target_x = target_x
-        self.target_y = target_y
-        self.animation_progress = 0
-
-    def update_animation(self, speed: float = 0.2):
-        """تحديث الرسوم المتحركة"""
-        if self.animation_progress < 1.0:
-            self.animation_progress = min(1.0, self.animation_progress + speed)
-            # تحديث الموضع بناءً على التقدم
-            self.x = self.x + (self.target_x - self.x) * self.animation_progress
-            self.y = self.y + (self.target_y - self.y) * self.animation_progress
-            return True
-        return False
 
     def __repr__(self):
         return f"Block(Color: {self.color}, Pos: ({self.x}, {self.y}), Type: {self.movement_type.name})"
@@ -81,12 +59,6 @@ class Board:
         exit_info = self.exits.get((x, y))
         if exit_info:
             return exit_info.get("color")
-        return None
-
-    def get_exit_direction(self, x: int, y: int) -> Union[str, None]:
-        exit_info = self.exits.get((x, y))
-        if exit_info:
-            return exit_info.get("direction")
         return None
 
 class GameState:
@@ -154,7 +126,11 @@ class GameState:
     def _is_path_clear(self, block: Block, direction: Tuple[int, int], distance: int) -> bool:
         """التحقق من أن المسار خالٍ من العوائق"""
         dx, dy = direction
+        # الحصول على جميع الإحداثيات المحتلة
         occupied = self.get_occupied_coords()
+        # إزالة إحداثيات القطعة نفسها من قائمة العوائق
+        moving_block_coords = set(block.get_absolute_coords())
+        occupied -= moving_block_coords
         
         for step in range(1, distance + 1):
             for shape_dx, shape_dy in block.shape:
@@ -167,7 +143,7 @@ class GameState:
                     if exit_color is None or exit_color.lower() != block.color.lower():
                         return False
                 
-                # التحقق من التصادم مع العوائق
+                # التحقق من التصادم مع العوائق الأخرى (الآن لا يشمل القطعة نفسها)
                 if (x, y) in occupied:
                     return False
         
@@ -184,9 +160,10 @@ class GameState:
     def _is_collision(self, new_coords: Set[Tuple[int, int]], block_index: int) -> bool:
         """التحقق من وجود تصادم"""
         occupied = self.get_occupied_coords()
-        for i, block in enumerate(self.blocks):
-            if i != block_index:
-                occupied.update(block.get_absolute_coords())
+        
+        # إزالة إحداثيات القطعة المتحركة من المجموعة
+        moving_block_coords = set(self.blocks[block_index].get_absolute_coords())
+        occupied -= moving_block_coords
         
         return not new_coords.isdisjoint(occupied)
     
@@ -243,7 +220,7 @@ class GameState:
     def get_keyboard_move(self, direction: str) -> Optional[Tuple[int, Tuple[int, int], int]]:
         """
         إرجاع حركة محتملة بناءً على اتجاه لوحة المفاتيح
-        تُستخدم للتحكم بالكيبورد
+        تُستخدم للتحكم بالكيبورد - تتحرك خطوة واحدة فقط
         """
         if self.selected_block_index is None or self.selected_block_index >= len(self.blocks):
             return None
@@ -266,33 +243,29 @@ class GameState:
         if not block.can_move((dx, dy)):
             return None
         
-        # البحث عن أقصى مسافة ممكنة في هذا الاتجاه
-        max_distance = 0
-        max_dist = max(self.board.width, self.board.height)
+        # التحقق من إمكانية تحريك القطعة خطوة واحدة فقط
+        distance = 1
+        new_block = block.move((dx, dy), distance)
+        new_coords = set(new_block.get_absolute_coords())
         
-        for distance in range(1, max_dist + 1):
-            new_block = block.move((dx, dy), distance)
-            new_coords = set(new_block.get_absolute_coords())
-            
-            # التحقق من أن المسار خالٍ
-            if not self._is_path_clear(block, (dx, dy), distance):
-                break
-            
-            # التحقق من الخروج من اللوحة
-            if self._is_exit_move_valid(new_coords, block):
-                max_distance = distance
-                break
-            
-            # التحقق من التصادم
-            if self._is_collision(new_coords, self.selected_block_index):
-                break
-            
-            max_distance = distance
+        # التحقق من أن المسار خالٍ
+        if not self._is_path_clear(block, (dx, dy), distance):
+            return None
         
-        if max_distance > 0:
-            return (self.selected_block_index, (dx, dy), max_distance)
+        # التحقق من الخروج من اللوحة
+        if self._is_exit_move_valid(new_coords, block):
+            return (self.selected_block_index, (dx, dy), distance)
         
-        return None
+        # التحقق من التصادم
+        if self._is_collision(new_coords, self.selected_block_index):
+            return None
+        
+        # التحقق من أن الحركة داخل اللوحة
+        for x, y in new_coords:
+            if not (0 <= x < self.board.width and 0 <= y < self.board.height):
+                return None
+        
+        return (self.selected_block_index, (dx, dy), distance)
     
     def select_next_block(self, forward: bool = True):
         """
