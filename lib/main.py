@@ -8,7 +8,8 @@ from view import GameVisualizer, CELL_SIZE
 LEVEL_FILES = [
     "levels/level_01.json",
     "levels/level_02.json",
-    "levels/level_03.json"
+    "levels/level_03.json",
+    "levels/level_04.json"
 ]
 
 def run_game(level_index=0):
@@ -151,8 +152,6 @@ def show_level_selection():
     pygame.display.set_caption("The Chroma Escape - Level Selection")
     clock = pygame.time.Clock()
     
-    # --- هنا كان الخطأ ---
-    # تم تصحيح السطر لإنشاء كائن خط بشكل صحيح
     try:
         font = pygame.font.Font(None, 36)
         small_font = pygame.font.Font(None, 24)
@@ -168,14 +167,17 @@ def show_level_selection():
         title_rect = title_text.get_rect(center=(300, 50))
         screen.blit(title_text, title_rect)
         
-        # عرض المستويات المتاحة
+        # عرض المستويات المتاحة بشكل ديناميكي
         for i, level_file in enumerate(LEVEL_FILES):
             level_name = os.path.basename(level_file).replace(".json", "").replace("_", " ").title()
             level_text = small_font.render(f"{i+1}. {level_name}", True, (0, 0, 0))
             level_rect = level_text.get_rect(center=(300, 120 + i * 40))
             screen.blit(level_text, level_rect)
         
-        instructions = small_font.render("Press 1-3 to select a level, ESC to quit", True, (0, 0, 0))
+        # تحديث التعليمات بناءً على عدد المستويات
+        max_level = len(LEVEL_FILES)
+        instructions_text = f"Press 1-{max_level} to select a level, ESC to quit"
+        instructions = small_font.render(instructions_text, True, (0, 0, 0))
         instructions_rect = instructions.get_rect(center=(300, 350))
         screen.blit(instructions, instructions_rect)
         
@@ -187,15 +189,16 @@ def show_level_selection():
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
-                elif pygame.K_1 <= event.key <= pygame.K_3:
+                # --- هذا هو الجزء المهم الذي تم تعديله ---
+                # أصبح الآن يتحقق من كل المفاتيح من 1 إلى عدد المستويات المتاحة
+                elif pygame.K_1 <= event.key <= pygame.K_1 + len(LEVEL_FILES) - 1:
                     level_index = event.key - pygame.K_1
-                    if level_index < len(LEVEL_FILES):
-                        # إغلاق نافذة الاختيار قبل بدء اللعبة
-                        pygame.quit()
-                        # بدء اللعبة بالمستوى المختار
-                        run_game(level_index)
-                        # بعد انتهاء اللعبة، لا نعود إلى قائمة الاختيار في هذا التصميم
-                        return
+                    # إغلاق نافذة الاختيار قبل بدء اللعبة
+                    pygame.quit()
+                    # بدء اللعبة بالمستوى المختار
+                    run_game(level_index)
+                    # بعد انتهاء اللعبة، لا نعود إلى قائمة الاختيار
+                    return
         
         clock.tick(30)
     
