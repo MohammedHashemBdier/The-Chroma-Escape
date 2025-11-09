@@ -5,7 +5,7 @@
     { "x": 0, "y": 0, "color": "red" },
     { "x": 6, "y": 6, "color": "blue" },
     { "x": 6, "y": 3, "color": "green" },
-    { "x": 4, "y": 1, "color": "cyan" }
+    { "x": 4, "y": 1, "color": "cyan", "direction": "RIGHT" }
   ],
   "barriers": [
     { "x": 4, "y": 0 },

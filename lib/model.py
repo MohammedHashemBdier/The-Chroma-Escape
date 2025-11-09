@@ -55,7 +55,10 @@ class Board:
         return 0 <= x < self.width and 0 <= y < self.height and (x, y) not in self.barriers
 
     def get_exit_color(self, x: int, y: int) -> Union[str, None]:
-        return self.exits.get((x, y))
+        exit_info = self.exits.get((x, y))
+        if exit_info:
+            return exit_info.get("color") # نرجع اللون فقط كما قبل
+        return None
 
 class GameState:
     def __init__(self, board: Board, blocks: List[Block], parent=None, action=None, depth=0):

@@ -74,6 +74,7 @@ class GameVisualizer:
         pygame.draw.rect(self.screen, border_color, (left, top, CELL_SIZE, CELL_SIZE), border_thickness)
     
     def _draw_grid(self, exits: dict):
+        # رسم خطوط الشبكة
         for x in range(self.width + 1):
             x_pos = x * CELL_SIZE
             pygame.draw.line(self.screen, GRID_LINE_COLOR, (x_pos, 0), (x_pos, self.screen_height), 1)
@@ -82,36 +83,56 @@ class GameVisualizer:
             y_pos = y * CELL_SIZE
             pygame.draw.line(self.screen, GRID_LINE_COLOR, (0, y_pos), (self.screen_width, y_pos), 1)
 
+        # رسم الإطار الخارجي للوحة
         border_thickness = 4
         border_color = (50, 50, 50)
-        
         pygame.draw.rect(self.screen, border_color, (0, 0, self.screen_width, self.screen_height), border_thickness)
 
+        # رسم المخارج
         exit_thickness = 8 
         
-        for (x, y), color_name in exits.items():
-            color = COLOR_MAP.get(color_name.lower(), (200, 200, 200))
+        for (x, y), exit_info in exits.items():
+            color = COLOR_MAP.get(exit_info["color"].lower(), (200, 200, 200))
+            direction = exit_info.get("direction")
             
-            if x == 0:
-                start_pos = (0, y * CELL_SIZE)
-                end_pos = (0, (y + 1) * CELL_SIZE)
-                pygame.draw.line(self.screen, color, start_pos, end_pos, exit_thickness)
+            # التحقق مما إذا كان المخرج على حافة اللوحة
+            is_on_edge = (x == 0 or x == self.width - 1 or y == 0 or y == self.height - 1)
+
+            if is_on_edge:
+                # رسم المخرج كخط على الحافة (الطريقة القديمة)
+                if x == 0:
+                    start_pos = (0, y * CELL_SIZE)
+                    end_pos = (0, (y + 1) * CELL_SIZE)
+                    pygame.draw.line(self.screen, color, start_pos, end_pos, exit_thickness)
+                
+                elif x == self.width - 1:
+                    start_pos = (self.screen_width, y * CELL_SIZE)
+                    end_pos = (self.screen_width, (y + 1) * CELL_SIZE)
+                    pygame.draw.line(self.screen, color, start_pos, end_pos, exit_thickness)
+
+                elif y == 0:
+                    start_pos = (x * CELL_SIZE, 0)
+                    end_pos = ((x + 1) * CELL_SIZE, 0)
+                    pygame.draw.line(self.screen, color, start_pos, end_pos, exit_thickness)
+
+                elif y == self.height - 1:
+                    start_pos = (x * CELL_SIZE, self.screen_height)
+                    end_pos = ((x + 1) * CELL_SIZE, self.screen_height)
+                    pygame.draw.line(self.screen, color, start_pos, end_pos, exit_thickness)
             
-            elif x == self.width - 1:
-                start_pos = (self.screen_width, y * CELL_SIZE)
-                end_pos = (self.screen_width, (y + 1) * CELL_SIZE)
-                pygame.draw.line(self.screen, color, start_pos, end_pos, exit_thickness)
-
-            elif y == 0:
-                start_pos = (x * CELL_SIZE, 0)
-                end_pos = ((x + 1) * CELL_SIZE, 0)
-                pygame.draw.line(self.screen, color, start_pos, end_pos, exit_thickness)
-
-            elif y == self.height - 1:
-                start_pos = (x * CELL_SIZE, self.screen_height)
-                end_pos = ((x + 1) * CELL_SIZE, self.screen_height)
-                pygame.draw.line(self.screen, color, start_pos, end_pos, exit_thickness)
-    
+            elif direction: # إذا كان مخرجاً داخلياً ولديه اتجاه محدد
+                left = x * CELL_SIZE
+                top = y * CELL_SIZE
+                
+                if direction.upper() == "UP":
+                    pygame.draw.line(self.screen, color, (left, top), (left + CELL_SIZE, top), exit_thickness)
+                elif direction.upper() == "DOWN":
+                    pygame.draw.line(self.screen, color, (left, top + CELL_SIZE), (left + CELL_SIZE, top + CELL_SIZE), exit_thickness)
+                elif direction.upper() == "LEFT":
+                    pygame.draw.line(self.screen, color, (left, top), (left, top + CELL_SIZE), exit_thickness)
+                elif direction.upper() == "RIGHT":
+                    pygame.draw.line(self.screen, color, (left + CELL_SIZE, top), (left + CELL_SIZE, top + CELL_SIZE), exit_thickness)
+                
     def draw_win_screen(self, move_count=0):
         WIN_COLOR = (124, 252, 0)
         TEXT_COLOR = (0, 0, 0)

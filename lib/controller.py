@@ -192,10 +192,13 @@ def load_game_state(file_path: str) -> GameState:
         print(f"Error: Invalid JSON format in {file_path}")
         return None
         
-    exits_dict = {
-        (exit_data['x'], exit_data['y']): exit_data['color']
-        for exit_data in data.get('exits', [])
-    }
+    exits_dict = {}
+    for exit_data in data.get('exits', []):
+        pos = (exit_data['x'], exit_data['y'])
+        exits_dict[pos] = {
+            "color": exit_data['color'],
+            "direction": exit_data.get('direction') # قد تكون None للمخارج على الحافة
+        }
 
     barriers_set = {
         (barrier_data['x'], barrier_data['y'])
