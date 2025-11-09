@@ -5,9 +5,6 @@ import math
 CELL_SIZE = 80
 GRID_LINE_COLOR = (150, 150, 150)
 BACKGROUND_COLOR = (240, 240, 240) 
-ANIMATION_SPEED = 0.2
-
-# في ملف view.py
 
 COLOR_MAP = {
     "red": (255, 0, 0),
@@ -35,7 +32,6 @@ class GameVisualizer:
         
         self.clock = pygame.time.Clock()
         
-        # إضافة خط للنصوص
         try:
             self.font = pygame.font.Font(None, 36)
             self.small_font = pygame.font.Font(None, 24)
@@ -43,8 +39,6 @@ class GameVisualizer:
             self.font = pygame.font.SysFont(None, 36)
             self.small_font = pygame.font.SysFont(None, 24)
         
-        # لتخزين الرسوم المتحركة
-        self.animations = []
         self.particles = []
 
     def _draw_movement_arrow(self, block: Block, is_selected: bool = False):
@@ -57,12 +51,10 @@ class GameVisualizer:
             pygame.draw.line(self.screen, arrow_color, (center_x - arrow_size, center_y), (center_x + arrow_size, center_y), 5)
             pygame.draw.line(self.screen, arrow_color, (center_x, center_y - arrow_size), (center_x, center_y + arrow_size), 5)
             return
-            
         elif block.movement_type.name == 'HORIZONTAL':
             pygame.draw.line(self.screen, arrow_color, (center_x - arrow_size, center_y), (center_x + arrow_size, center_y), 5)
             pygame.draw.polygon(self.screen, arrow_color, [(center_x + arrow_size, center_y), (center_x + arrow_size - 5, center_y - 5), (center_x + arrow_size - 5, center_y + 5)])
             pygame.draw.polygon(self.screen, arrow_color, [(center_x - arrow_size, center_y), (center_x - arrow_size + 5, center_y - 5), (center_x - arrow_size + 5, center_y + 5)])
-
         elif block.movement_type.name == 'VERTICAL':
             pygame.draw.line(self.screen, arrow_color, (center_x, center_y - arrow_size), (center_x, center_y + arrow_size), 5)
             pygame.draw.polygon(self.screen, arrow_color, [(center_x, center_y + arrow_size), (center_x - 5, center_y + arrow_size - 5), (center_x + 5, center_y + arrow_size - 5)])
@@ -72,14 +64,11 @@ class GameVisualizer:
         left = int(x * CELL_SIZE)
         top = int(y * CELL_SIZE)
         
-        # تعديل اللون بناءً على الحالة
         if is_selected:
-            # إضافة تأثير توهج للقطعة المحددة
             glow_color = tuple(min(255, c + 50) for c in color)
             pygame.draw.rect(self.screen, glow_color, (left-2, top-2, CELL_SIZE+4, CELL_SIZE+4))
             pygame.draw.rect(self.screen, color, (left, top, CELL_SIZE, CELL_SIZE))
         elif is_valid_move:
-            # إضافة تأثير شفاف للحركات الممكنة
             s = pygame.Surface((CELL_SIZE, CELL_SIZE))
             s.set_alpha(128)
             s.fill(color)
@@ -89,11 +78,9 @@ class GameVisualizer:
 
         border_thickness = 3 if is_selected else 1
         border_color = (0, 0, 0) if is_selected else GRID_LINE_COLOR
-        
         pygame.draw.rect(self.screen, border_color, (left, top, CELL_SIZE, CELL_SIZE), border_thickness)
     
     def _draw_grid(self, exits: dict):
-        # رسم خطوط الشبكة
         for x in range(self.width + 1):
             x_pos = x * CELL_SIZE
             pygame.draw.line(self.screen, GRID_LINE_COLOR, (x_pos, 0), (x_pos, self.screen_height), 1)
@@ -102,44 +89,35 @@ class GameVisualizer:
             y_pos = y * CELL_SIZE
             pygame.draw.line(self.screen, GRID_LINE_COLOR, (0, y_pos), (self.screen_width, y_pos), 1)
 
-        # رسم الإطار الخارجي للوحة
         border_thickness = 4
         border_color = (50, 50, 50)
         pygame.draw.rect(self.screen, border_color, (0, 0, self.screen_width, self.screen_height), border_thickness)
 
-        # رسم المخارج
         exit_thickness = 8 
         
         for (x, y), exit_info in exits.items():
             color = COLOR_MAP.get(exit_info["color"].lower(), (200, 200, 200))
             direction = exit_info.get("direction")
-            
-            # التحقق مما إذا كان المخرج على حافة اللوحة
             is_on_edge = (x == 0 or x == self.width - 1 or y == 0 or y == self.height - 1)
 
             if is_on_edge:
-                # رسم المخرج كخط على الحافة (الطريقة القديمة)
                 if x == 0:
                     start_pos = (0, y * CELL_SIZE)
                     end_pos = (0, (y + 1) * CELL_SIZE)
                     pygame.draw.line(self.screen, color, start_pos, end_pos, exit_thickness)
-                
                 elif x == self.width - 1:
                     start_pos = (self.screen_width, y * CELL_SIZE)
                     end_pos = (self.screen_width, (y + 1) * CELL_SIZE)
                     pygame.draw.line(self.screen, color, start_pos, end_pos, exit_thickness)
-
                 elif y == 0:
                     start_pos = (x * CELL_SIZE, 0)
                     end_pos = ((x + 1) * CELL_SIZE, 0)
                     pygame.draw.line(self.screen, color, start_pos, end_pos, exit_thickness)
-
                 elif y == self.height - 1:
                     start_pos = (x * CELL_SIZE, self.screen_height)
                     end_pos = ((x + 1) * CELL_SIZE, self.screen_height)
                     pygame.draw.line(self.screen, color, start_pos, end_pos, exit_thickness)
-            
-            elif direction: # إذا كان مخرجاً داخلياً ولديه اتجاه محدد
+            elif direction:
                 left = x * CELL_SIZE
                 top = y * CELL_SIZE
                 
@@ -158,17 +136,14 @@ class GameVisualizer:
         
         self.screen.fill(WIN_COLOR)
         
-        # عرض رسالة الفوز
         text = self.font.render("PUZZLE SOLVED!", True, TEXT_COLOR)
         text_rect = text.get_rect(center=(self.screen_width // 2, self.screen_height // 2 - 40))
         self.screen.blit(text, text_rect)
         
-        # عرض عدد الحركات
         moves_text = self.font.render(f"Moves: {move_count}", True, TEXT_COLOR)
         moves_rect = moves_text.get_rect(center=(self.screen_width // 2, self.screen_height // 2 + 20))
         self.screen.blit(moves_text, moves_rect)
         
-        # عرض تعليمات الخروج
         exit_text = self.small_font.render("Press ESC to exit", True, TEXT_COLOR)
         exit_rect = exit_text.get_rect(center=(self.screen_width // 2, self.screen_height // 2 + 80))
         self.screen.blit(exit_text, exit_rect)
@@ -176,22 +151,17 @@ class GameVisualizer:
         pygame.display.flip()
     
     def draw_ui(self, state: GameState, move_count=0, message="", control_mode="mouse"):
-        """رسم واجهة المستخدم"""
-        # عرض عدد الحركات
         moves_text = self.small_font.render(f"Moves: {move_count}", True, (0, 0, 0))
         self.screen.blit(moves_text, (10, 10))
         
-        # عرض عدد القطع المتبقية
         blocks_text = self.small_font.render(f"Blocks: {len(state.blocks)}", True, (0, 0, 0))
         self.screen.blit(blocks_text, (10, 40))
         
-        # عرض رسالة إذا وجدت
         if message:
             msg_text = self.small_font.render(message, True, (255, 0, 0))
             msg_rect = msg_text.get_rect(center=(self.screen_width // 2, 30))
             self.screen.blit(msg_text, msg_rect)
         
-        # عرض تعليمات
         if control_mode == "keyboard":
             instructions = [
                 "Use TAB to select blocks",
@@ -217,18 +187,15 @@ class GameVisualizer:
             y_pos += 25
     
     def _draw_particles(self):
-        """رسم الجسيمات للرسوم المتحركة"""
         for particle in self.particles[:]:
             particle['life'] -= 1
             if particle['life'] <= 0:
                 self.particles.remove(particle)
                 continue
             
-            # تحديث موقع الجسيم
             particle['x'] += particle['dx']
             particle['y'] += particle['dy']
             
-            # رسم الجسيم
             pygame.draw.circle(
                 self.screen, 
                 particle['color'], 
@@ -237,7 +204,6 @@ class GameVisualizer:
             )
     
     def _create_exit_particles(self, x: int, y: int, color: tuple):
-        """إنشاء جسيمات عند خروج القطعة"""
         center_x = x * CELL_SIZE + CELL_SIZE // 2
         center_y = y * CELL_SIZE + CELL_SIZE // 2
         
@@ -253,18 +219,15 @@ class GameVisualizer:
                 'size': math.random() * 5 + 2,
                 'life': 30
             })
-    
+
     def draw(self, state: GameState, selected_block_coords: set = None, move_count=0, message="", control_mode="mouse"):
         self.screen.fill(BACKGROUND_COLOR)
         
-        # رسم الشبكة والحواجز
         for x, y in state.board.barriers:
             self._draw_cell(x, y, COLOR_MAP['gray'])
             
-        # رسم القطع
         for i, block in enumerate(state.blocks):
             color = COLOR_MAP.get(block.color.lower(), (0, 0, 0))
-            
             is_selected = (i == state.selected_block_index) or (set(block.get_absolute_coords()) == selected_block_coords)
             
             for x, y in block.get_absolute_coords():
@@ -272,12 +235,8 @@ class GameVisualizer:
 
             self._draw_movement_arrow(block, is_selected=is_selected)
         
-        # رسم الجسيمات
         self._draw_particles()
-        
         self._draw_grid(state.board.exits)
-        
-        # رسم واجهة المستخدم
         self.draw_ui(state, move_count, message, control_mode)
         
         pygame.display.flip()

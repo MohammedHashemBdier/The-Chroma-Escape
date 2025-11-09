@@ -1,12 +1,11 @@
-import copy
 import pygame
 import os
 import sys
-from controller import GameLogic, load_game_state
+import copy
+from controller import GameLogic, load_game_state, MOVE_SUCCESS, MOVE_INVALID, MOVE_EXIT
 from view import GameVisualizer, CELL_SIZE
+from sound_manager import SoundManager
 
-# قائمة بالمستويات المتاحة
-# تأكد من وجود مجلد 'levels' وبداخله هذه الملفات
 LEVEL_FILES = [
     "levels/level_01.json",
     "levels/level_02.json",
@@ -15,22 +14,21 @@ LEVEL_FILES = [
 ]
 
 def run_game(level_index=0):
-    """
-    تشغيل اللعبة للمستوى المحدد
-    """
     current_level = level_index % len(LEVEL_FILES)
     LEVEL_FILE = LEVEL_FILES[current_level]
     
     current_state = load_game_state(LEVEL_FILE)
     
     if current_state is None:
-        print(f"Error: Failed to load game state from {LEVEL_FILE}. Check file path or content.")
+        print(f"Error: Failed to load game state from {LEVEL_FILE}.")
         return
 
     logic = GameLogic()
+    sound_manager = SoundManager()
+    sound_manager.load_sounds()
     
     if current_state.board.width <= 0 or current_state.board.height <= 0:
-        print(f"Error: Invalid board dimensions ({current_state.board.width}x{current_state.board.height}).")
+        print(f"Error: Invalid board dimensions.")
         return
         
     viz = GameVisualizer(current_state.board.width, current_state.board.height)
@@ -40,28 +38,21 @@ def run_game(level_index=0):
     drag_start_cell = None
     move_count = 0
     message = ""
-    control_mode = "mouse"  # "mouse" أو "keyboard"
-    
-    # حفظ الحالة الأولية لإعادة التشغيل
+    control_mode = "mouse"
     initial_state = current_state
     
     while running:
-        # التحقق من حالة الفوز
         if current_state.check_win_condition():
             print("Congratulations! You solved the puzzle!")
+            sound_manager.play_win()
             viz.draw_win_screen(move_count)
             
-            # انتظار ضغط ESC للخروج أو الانتقال للمستوى التالي
             waiting_for_exit = True
             while waiting_for_exit:
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                         waiting_for_exit = False
                         running = False
-                    # يمكنك إضافة خيار للانتقال للمستوى التالي هنا
-                    # elif event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
-                    #     run_game(current_level + 1)
-                    #     waiting_for_exit = False
                 viz.clock.tick(10)
             break
 
@@ -72,69 +63,77 @@ def run_game(level_index=0):
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
-                elif event.key == pygame.K_u:  # التراجع عن الحركة
-                    current_state = logic.undo_move(current_state)
-                    move_count = max(0, move_count - 1)
-                    message = "Move undone"
-                elif event.key == pygame.K_r:  # إعادة التشغيل
+                elif event.key == pygame.K_u:
+                    new_state, status = logic.undo_move(current_state)
+                    if status == MOVE_SUCCESS:
+                        current_state = new_state
+                        move_count = max(0, move_count - 1)
+                        message = "Move undone"
+                        sound_manager.play_undo()
+                    else:
+                        message = "No moves to undo"
+                elif event.key == pygame.K_r:
                     current_state = copy.deepcopy(initial_state)
                     move_count = 0
-                    logic.move_history = [] # تفريغ سجل الحركات
+                    logic.move_history = []
                     message = "Level restarted"
-                elif event.key == pygame.K_m:  # التبديل إلى التحكم بالماوس
+                    sound_manager.play_restart()
+                elif event.key == pygame.K_m:
                     control_mode = "mouse"
                     message = "Switched to mouse control"
-                elif event.key == pygame.K_k:  # التبديل إلى التحكم بالكيبورد
+                elif event.key == pygame.K_k:
                     control_mode = "keyboard"
                     message = "Switched to keyboard control"
                 
-                # التحكم بالكيبورد
                 elif control_mode == "keyboard":
-                    if event.key == pygame.K_TAB:  # تحديد القطعة التالية
-                        current_state = logic.select_next_block(current_state, not event.mod & pygame.KMOD_SHIFT)
-                    elif event.key in [pygame.K_UP, pygame.K_w]:  # التحرك للأعلى
-                        new_state = logic.try_move_keyboard(current_state, "UP")
-                        if new_state != current_state:
-                            current_state = new_state
-                            move_count += 1
-                            message = ""
+                    if event.key == pygame.K_TAB:
+                        new_state = logic.select_next_block(current_state, not event.mod & pygame.KMOD_SHIFT)
+                        if new_state.selected_block_index != current_state.selected_block_index:
+                           sound_manager.play_select()
+                        current_state = new_state
+                    elif event.key in [pygame.K_UP, pygame.K_w]:
+                        new_state, status = logic.try_move_keyboard(current_state, "UP")
+                        if status == MOVE_SUCCESS:
+                            current_state = new_state; move_count += 1; message = ""; sound_manager.play_move()
+                        elif status == MOVE_EXIT:
+                            current_state = new_state; move_count += 1; message = ""; sound_manager.play_exit()
                         else:
-                            message = "Invalid move!"
-                    elif event.key in [pygame.K_DOWN, pygame.K_s]:  # التحرك للأسفل
-                        new_state = logic.try_move_keyboard(current_state, "DOWN")
-                        if new_state != current_state:
-                            current_state = new_state
-                            move_count += 1
-                            message = ""
+                            message = "Invalid move!"; sound_manager.play_invalid()
+                    elif event.key in [pygame.K_DOWN, pygame.K_s]:
+                        new_state, status = logic.try_move_keyboard(current_state, "DOWN")
+                        if status == MOVE_SUCCESS:
+                            current_state = new_state; move_count += 1; message = ""; sound_manager.play_move()
+                        elif status == MOVE_EXIT:
+                            current_state = new_state; move_count += 1; message = ""; sound_manager.play_exit()
                         else:
-                            message = "Invalid move!"
-                    elif event.key in [pygame.K_LEFT, pygame.K_a]:  # التحرك لليسار
-                        new_state = logic.try_move_keyboard(current_state, "LEFT")
-                        if new_state != current_state:
-                            current_state = new_state
-                            move_count += 1
-                            message = ""
+                            message = "Invalid move!"; sound_manager.play_invalid()
+                    elif event.key in [pygame.K_LEFT, pygame.K_a]:
+                        new_state, status = logic.try_move_keyboard(current_state, "LEFT")
+                        if status == MOVE_SUCCESS:
+                            current_state = new_state; move_count += 1; message = ""; sound_manager.play_move()
+                        elif status == MOVE_EXIT:
+                            current_state = new_state; move_count += 1; message = ""; sound_manager.play_exit()
                         else:
-                            message = "Invalid move!"
-                    elif event.key in [pygame.K_RIGHT, pygame.K_d]:  # التحرك لليمين
-                        new_state = logic.try_move_keyboard(current_state, "RIGHT")
-                        if new_state != current_state:
-                            current_state = new_state
-                            move_count += 1
-                            message = ""
+                            message = "Invalid move!"; sound_manager.play_invalid()
+                    elif event.key in [pygame.K_RIGHT, pygame.K_d]:
+                        new_state, status = logic.try_move_keyboard(current_state, "RIGHT")
+                        if status == MOVE_SUCCESS:
+                            current_state = new_state; move_count += 1; message = ""; sound_manager.play_move()
+                        elif status == MOVE_EXIT:
+                            current_state = new_state; move_count += 1; message = ""; sound_manager.play_exit()
                         else:
-                            message = "Invalid move!"
+                            message = "Invalid move!"; sound_manager.play_invalid()
                     
             elif event.type == pygame.MOUSEBUTTONDOWN and control_mode == "mouse":
                 mouse_x, mouse_y = event.pos
                 cell_x = mouse_x // CELL_SIZE
                 cell_y = mouse_y // CELL_SIZE
                 
-                # البحث عن القطعة التي تم النقر عليها
                 for i, block in enumerate(current_state.blocks):
                     if (cell_x, cell_y) in block.get_absolute_coords():
                         selected_block_index = i
                         drag_start_cell = (cell_x, cell_y)
+                        sound_manager.play_select()
                         break
                         
             elif event.type == pygame.MOUSEBUTTONUP and control_mode == "mouse":
@@ -157,20 +156,19 @@ def run_game(level_index=0):
                         distance = abs(total_dy)
                     
                     if distance > 0:
-                        new_state = logic.try_move_manual(
+                        new_state, status = logic.try_move_manual(
                             current_state, 
                             selected_block_index, 
                             direction_vector, 
                             distance
                         )
                         
-                        # التحقق مما إذا كانت الحركة ممكنة
-                        if new_state != current_state:
-                            current_state = new_state
-                            move_count += 1
-                            message = ""
+                        if status == MOVE_SUCCESS:
+                            current_state = new_state; move_count += 1; message = ""; sound_manager.play_move()
+                        elif status == MOVE_EXIT:
+                            current_state = new_state; move_count += 1; message = ""; sound_manager.play_exit()
                         else:
-                            message = "Invalid move!"
+                            message = "Invalid move!"; sound_manager.play_invalid()
 
                 selected_block_index = None
                 drag_start_cell = None
@@ -185,9 +183,6 @@ def run_game(level_index=0):
     pygame.quit()
 
 def show_level_selection():
-    """
-    عرض قائمة المستويات المتاحة للسماح للاعب بالاختيار
-    """
     pygame.init()
     screen = pygame.display.set_mode((600, 400))
     pygame.display.set_caption("The Chroma Escape - Level Selection")
@@ -208,14 +203,12 @@ def show_level_selection():
         title_rect = title_text.get_rect(center=(300, 50))
         screen.blit(title_text, title_rect)
         
-        # عرض المستويات المتاحة بشكل ديناميكي
         for i, level_file in enumerate(LEVEL_FILES):
             level_name = os.path.basename(level_file).replace(".json", "").replace("_", " ").title()
             level_text = small_font.render(f"{i+1}. {level_name}", True, (0, 0, 0))
             level_rect = level_text.get_rect(center=(300, 120 + i * 40))
             screen.blit(level_text, level_rect)
         
-        # تحديث التعليمات بناءً على عدد المستويات المتاحة
         max_level = len(LEVEL_FILES)
         instructions_text = f"Press 1-{max_level} to select a level, ESC to quit"
         instructions = small_font.render(instructions_text, True, (0, 0, 0))
@@ -230,15 +223,10 @@ def show_level_selection():
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
-                # --- هذا هو الجزء المهم الذي تم تعديله ---
-                # أصبح الآن يتحقق من كل المفاتيح من 1 إلى عدد المستويات المتاحة
                 elif pygame.K_1 <= event.key <= pygame.K_1 + len(LEVEL_FILES) - 1:
                     level_index = event.key - pygame.K_1
-                    # إغلاق نافذة الاختيار قبل بدء اللعبة
                     pygame.quit()
-                    # بدء اللعبة بالمستوى المختار
                     run_game(level_index)
-                    # بعد انتهاء اللعبة، لا نعود إلى قائمة الاختيار
                     return
         
         clock.tick(30)
