@@ -2,50 +2,40 @@
   "board_width": 6,
   "board_height": 6,
   "exits": [
-    {
-      "x": 5,
-      "y": 3,
-      "color": "red"
-    },
-    {
-      "x": 0,
-      "y": 2,
-      "color": "blue"
-    },
-    {
-      "x": 2,
-      "y": 5,
-      "color": "yellow"
-    }
+    { "x": 0, "y": 2, "color": "red" },
+    { "x": 5, "y": 3, "color": "blue" }
   ],
   "barriers": [
-    { "x": 1, "y": 1 },
-    { "x": 4, "y": 4 }
+    { "x": 2, "y": 2 },
+    { "x": 3, "y": 3 }
   ],
   "blocks": [
     {
       "color": "red",
-      "x": 4,
-      "y": 3,
-      "movement_type": "HORIZONTAL",
+      "x": 3,
+      "y": 2,
       "shape": [
         [0, 0],
-        [-1, 0]
-      ]
-    },
-    {
-      "color": "yellow",
-      "x": 2,
-      "y": 4,
-      "movement_type": "VERTICAL",
-      "shape": [[0, 0]]
+        [1, 0]
+      ],
+      "movement_type": "HORIZONTAL"
     },
     {
       "color": "blue",
-      "x": 3,
-      "y": 0,
-      "movement_type": "ANY",
-      "shape": [[0, 0]]
+      "x": 2,
+      "y": 3,
+      "shape": [
+        [0, 0],
+        [0, 1]
+      ],
+      "movement_type": "VERTICAL"
+    },
+    {
+      "color": "yellow",
+      "x": 1,
+      "y": 1,
+      "shape": [[0, 0]],
+      "movement_type": "ANY"
     }
   ]
 }

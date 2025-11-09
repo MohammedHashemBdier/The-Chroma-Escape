@@ -1,126 +1,69 @@
 {
-  "board_width": 6,
-  "board_height": 6,
+  "board_width": 7,
+  "board_height": 7,
   "exits": [
-    {
-      "x": 5,
-      "y": 2,
-      "color": "red"
-    }
+    { "x": 0, "y": 3, "color": "red" },
+    { "x": 6, "y": 3, "color": "blue" },
+    { "x": 3, "y": 0, "color": "yellow" },
+    { "x": 3, "y": 6, "color": "green" },
+    { "x": 0, "y": 1, "color": "purple" },
+    { "x": 6, "y": 5, "color": "orange" }
   ],
-  "barriers": [],
+  "barriers": [{ "x": 3, "y": 3 }],
   "blocks": [
     {
       "color": "red",
-      "x": 1,
-      "y": 2,
-      "movement_type": "HORIZONTAL",
+      "x": 4,
+      "y": 3,
       "shape": [
         [0, 0],
         [1, 0]
-      ]
+      ],
+      "movement_type": "HORIZONTAL"
     },
     {
       "color": "blue",
-      "x": 0,
-      "y": 0,
-      "movement_type": "VERTICAL",
+      "x": 1,
+      "y": 3,
       "shape": [
         [0, 0],
-        [0, 1]
-      ]
+        [1, 0]
+      ],
+      "movement_type": "HORIZONTAL"
     },
     {
       "color": "yellow",
-      "x": 2,
-      "y": 0,
-      "movement_type": "HORIZONTAL",
-      "shape": [
-        [0, 0],
-        [1, 0],
-        [2, 0]
-      ]
-    },
-    {
-      "color": "green",
-      "x": 5,
-      "y": 0,
-      "movement_type": "VERTICAL",
+      "x": 3,
+      "y": 4,
       "shape": [
         [0, 0],
         [0, 1]
-      ]
+      ],
+      "movement_type": "VERTICAL"
+    },
+    {
+      "color": "green",
+      "x": 3,
+      "y": 1,
+      "shape": [
+        [0, 0],
+        [0, 1]
+      ],
+      "movement_type": "VERTICAL"
     },
     {
       "color": "purple",
       "x": 1,
       "y": 1,
-      "movement_type": "VERTICAL",
-      "shape": [
-        [0, 0],
-        [0, 1]
-      ]
+      "shape": [[0, 0]],
+      "movement_type": "ANY"
     },
     {
       "color": "orange",
-      "x": 3,
-      "y": 1,
-      "movement_type": "VERTICAL",
-      "shape": [
-        [0, 0],
-        [0, 1]
-      ]
-    },
-    {
-      "color": "cyan",
-      "x": 0,
-      "y": 3,
-      "movement_type": "HORIZONTAL",
-      "shape": [
-        [0, 0],
-        [1, 0]
-      ]
-    },
-    {
-      "color": "magenta",
-      "x": 3,
-      "y": 3,
-      "movement_type": "VERTICAL",
-      "shape": [
-        [0, 0],
-        [0, 1]
-      ]
-    },
-    {
-      "color": "lime",
-      "x": 4,
-      "y": 4,
-      "movement_type": "HORIZONTAL",
-      "shape": [
-        [0, 0],
-        [1, 0]
-      ]
-    },
-    {
-      "color": "brown",
-      "x": 0,
+      "x": 5,
       "y": 5,
-      "movement_type": "HORIZONTAL",
-      "shape": [
-        [0, 0],
-        [1, 0],
-        [2, 0]
-      ]
-    },
-    {
-      "color": "pink",
-      "x": 4,
-      "y": 5,
-      "movement_type": "VERTICAL",
-      "shape": [
-        [0, 0],
-        [0, 1]
-      ]
+      "shape": [[0, 0]],
+      "movement_type": "ANY"
     }
   ]
 }
