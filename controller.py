@@ -1,10 +1,12 @@
 from model import GameState, MovementType, Block, Board
 import json
 import copy
+import math
 
 class GameLogic:
     def __init__(self):
         self.move_history = []  # لتخزين تاريخ الحركات للتراجع
+        self.animation_states = {}  # لتخزين حالات الرسوم المتحركة
 
     def try_move_manual(self, current_state: GameState, block_index: int, direction_vector: tuple, distance: int) -> GameState:
         if distance <= 0:
@@ -31,7 +33,8 @@ class GameLogic:
             x=final_x, 
             y=final_y, 
             shape=block.shape, 
-            movement_type=block.movement_type
+            movement_type=block.movement_type,
+            id=block.id
         )
         final_coords = set(moved_block.get_absolute_coords())
 
@@ -49,6 +52,36 @@ class GameLogic:
         new_state = self._create_new_state_after_move(current_state, block_index, moved_block)
         self.move_history.append((current_state, (block_index, dx, dy, distance)))
         return new_state
+    
+    def try_move_keyboard(self, current_state: GameState, direction: str) -> GameState:
+        """
+        محاولة تحريك القطعة المحددة باستخدام لوحة المفاتيح
+        """
+        move_info = current_state.get_keyboard_move(direction)
+        if move_info is None:
+            return current_state
+        
+        block_index, (dx, dy), distance = move_info
+        return self.try_move_manual(current_state, block_index, (dx, dy), distance)
+    
+    def select_next_block(self, current_state: GameState, forward: bool = True) -> GameState:
+        """
+        تحديد القطعة التالية أو السابقة للتحكم بالكيبورد
+        """
+        new_state = copy.deepcopy(current_state)
+        new_state.select_next_block(forward)
+        return new_state
+    
+    def select_block_at(self, current_state: GameState, x: int, y: int) -> GameState:
+        """
+        تحديد القطعة في الموقع المحدد
+        """
+        block_index = current_state.get_block_at(x, y)
+        if block_index is not None:
+            new_state = copy.deepcopy(current_state)
+            new_state.selected_block_index = block_index
+            return new_state
+        return current_state
     
     def undo_move(self, current_state: GameState) -> GameState:
         """التراجع عن آخر حركة"""
@@ -72,7 +105,7 @@ class GameLogic:
             check_x = block.x + dx * step
             check_y = block.y + dy * step
             
-            temp_block = Block(block.color, check_x, check_y, moving_block_shape, block.movement_type)
+            temp_block = Block(block.color, check_x, check_y, moving_block_shape, block.movement_type, block.id)
             temp_coords = set(temp_block.get_absolute_coords())
 
             if temp_coords.intersection(obstacle_coords):
@@ -101,13 +134,19 @@ class GameLogic:
         new_blocks = current_state.blocks[:]
         new_blocks[block_index] = moved_block
         
-        return GameState(board=current_state.board, blocks=new_blocks)
+        new_state = GameState(board=current_state.board, blocks=new_blocks, parent=current_state)
+        new_state.selected_block_index = current_state.selected_block_index
+        new_state.move_count = current_state.move_count + 1
+        return new_state
     
     def _create_new_state_after_exit(self, current_state: GameState, block_index: int) -> GameState:
         new_blocks = current_state.blocks[:]
         new_blocks.pop(block_index)
         
-        return GameState(board=current_state.board, blocks=new_blocks)
+        new_state = GameState(board=current_state.board, blocks=new_blocks, parent=current_state)
+        new_state.selected_block_index = None
+        new_state.move_count = current_state.move_count + 1
+        return new_state
     
     def get_possible_moves(self, current_state: GameState) -> list:
         """إرجاع قائمة بالحالات الممكنة بعد كل حركة"""
@@ -133,7 +172,8 @@ class GameLogic:
                         x=final_x, 
                         y=final_y, 
                         shape=block.shape, 
-                        movement_type=block.movement_type
+                        movement_type=block.movement_type,
+                        id=block.id
                     )
                     final_coords = set(moved_block.get_absolute_coords())
                     
@@ -220,7 +260,7 @@ def load_game_state(file_path: str) -> GameState:
         "ANY": MovementType.ANY
     }
     
-    for block_data in data['blocks']:
+    for i, block_data in enumerate(data['blocks']):
         move_type = movement_map.get(block_data.get('movement_type').upper())
         if not move_type:
             raise ValueError(f"Invalid movement type: {block_data.get('movement_type')}")
@@ -230,7 +270,8 @@ def load_game_state(file_path: str) -> GameState:
             x=block_data['x'],
             y=block_data['y'],
             shape=[tuple(s) for s in block_data['shape']], 
-            movement_type=move_type
+            movement_type=move_type,
+            id=i  # إضافة معرف فريد للقطعة
         )
         blocks_list.append(block)
 

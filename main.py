@@ -1,5 +1,7 @@
+import copy
 import pygame
 import os
+import sys
 from controller import GameLogic, load_game_state
 from view import GameVisualizer, CELL_SIZE
 
@@ -38,6 +40,7 @@ def run_game(level_index=0):
     drag_start_cell = None
     move_count = 0
     message = ""
+    control_mode = "mouse"  # "mouse" أو "keyboard"
     
     # حفظ الحالة الأولية لإعادة التشغيل
     initial_state = current_state
@@ -70,21 +73,59 @@ def run_game(level_index=0):
                 if event.key == pygame.K_ESCAPE:
                     running = False
                 elif event.key == pygame.K_u:  # التراجع عن الحركة
-                    # نحتاج لتعديل GameLogic للتعامل مع التراجع بشكل أفضل
-                    # الحل الحالي بسيط وقد لا يكون مثالياً
-                    if logic.move_history:
-                        current_state, _ = logic.move_history.pop()
-                        move_count -= 1
-                        message = "Move undone"
-                    else:
-                        message = "No moves to undo"
+                    current_state = logic.undo_move(current_state)
+                    move_count = max(0, move_count - 1)
+                    message = "Move undone"
                 elif event.key == pygame.K_r:  # إعادة التشغيل
-                    current_state = initial_state
+                    current_state = copy.deepcopy(initial_state)
                     move_count = 0
                     logic.move_history = [] # تفريغ سجل الحركات
                     message = "Level restarted"
+                elif event.key == pygame.K_m:  # التبديل إلى التحكم بالماوس
+                    control_mode = "mouse"
+                    message = "Switched to mouse control"
+                elif event.key == pygame.K_k:  # التبديل إلى التحكم بالكيبورد
+                    control_mode = "keyboard"
+                    message = "Switched to keyboard control"
+                
+                # التحكم بالكيبورد
+                elif control_mode == "keyboard":
+                    if event.key == pygame.K_TAB:  # تحديد القطعة التالية
+                        current_state = logic.select_next_block(current_state, not event.mod & pygame.KMOD_SHIFT)
+                    elif event.key in [pygame.K_UP, pygame.K_w]:  # التحرك للأعلى
+                        new_state = logic.try_move_keyboard(current_state, "UP")
+                        if new_state != current_state:
+                            current_state = new_state
+                            move_count += 1
+                            message = ""
+                        else:
+                            message = "Invalid move!"
+                    elif event.key in [pygame.K_DOWN, pygame.K_s]:  # التحرك للأسفل
+                        new_state = logic.try_move_keyboard(current_state, "DOWN")
+                        if new_state != current_state:
+                            current_state = new_state
+                            move_count += 1
+                            message = ""
+                        else:
+                            message = "Invalid move!"
+                    elif event.key in [pygame.K_LEFT, pygame.K_a]:  # التحرك لليسار
+                        new_state = logic.try_move_keyboard(current_state, "LEFT")
+                        if new_state != current_state:
+                            current_state = new_state
+                            move_count += 1
+                            message = ""
+                        else:
+                            message = "Invalid move!"
+                    elif event.key in [pygame.K_RIGHT, pygame.K_d]:  # التحرك لليمين
+                        new_state = logic.try_move_keyboard(current_state, "RIGHT")
+                        if new_state != current_state:
+                            current_state = new_state
+                            move_count += 1
+                            message = ""
+                        else:
+                            message = "Invalid move!"
                     
-            elif event.type == pygame.MOUSEBUTTONDOWN:
+            elif event.type == pygame.MOUSEBUTTONDOWN and control_mode == "mouse":
                 mouse_x, mouse_y = event.pos
                 cell_x = mouse_x // CELL_SIZE
                 cell_y = mouse_y // CELL_SIZE
@@ -96,7 +137,7 @@ def run_game(level_index=0):
                         drag_start_cell = (cell_x, cell_y)
                         break
                         
-            elif event.type == pygame.MOUSEBUTTONUP:
+            elif event.type == pygame.MOUSEBUTTONUP and control_mode == "mouse":
                 if selected_block_index is not None and drag_start_cell is not None:
                     mouse_x, mouse_y = event.pos
                     cell_x_end = mouse_x // CELL_SIZE
@@ -138,7 +179,7 @@ def run_game(level_index=0):
         if selected_block_index is not None:
              selected_coords = set(current_state.blocks[selected_block_index].get_absolute_coords())
              
-        viz.draw(current_state, selected_block_coords=selected_coords, move_count=move_count, message=message)
+        viz.draw(current_state, selected_block_coords=selected_coords, move_count=move_count, message=message, control_mode=control_mode)
         viz.clock.tick(60)
         
     pygame.quit()
@@ -154,7 +195,7 @@ def show_level_selection():
     
     try:
         font = pygame.font.Font(None, 36)
-        small_font = pygame.font.Font(None, 24)
+        small_font = pygame.font.SysFont(None, 24)
     except pygame.error:
         font = pygame.font.SysFont(None, 36)
         small_font = pygame.font.SysFont(None, 24)
@@ -174,7 +215,7 @@ def show_level_selection():
             level_rect = level_text.get_rect(center=(300, 120 + i * 40))
             screen.blit(level_text, level_rect)
         
-        # تحديث التعليمات بناءً على عدد المستويات
+        # تحديث التعليمات بناءً على عدد المستويات المتاحة
         max_level = len(LEVEL_FILES)
         instructions_text = f"Press 1-{max_level} to select a level, ESC to quit"
         instructions = small_font.render(instructions_text, True, (0, 0, 0))

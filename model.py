@@ -1,6 +1,7 @@
 from enum import Enum
-from typing import Union, List, Tuple, Set
+from typing import Union, List, Tuple, Set, Optional
 import copy
+import time
 
 class MovementType(Enum):
     HORIZONTAL = 1
@@ -8,12 +9,16 @@ class MovementType(Enum):
     ANY = 3
 
 class Block:
-    def __init__(self, color: str, x: int, y: int, shape: List[Tuple[int, int]], movement_type: MovementType):
+    def __init__(self, color: str, x: int, y: int, shape: List[Tuple[int, int]], movement_type: MovementType, id: int = None):
         self.color = color
         self.x = x
         self.y = y
         self.shape = shape
         self.movement_type = movement_type
+        self.id = id  # إضافة معرف فريد للقطعة
+        self.animation_progress = 0  # للرسوم المتحركة
+        self.target_x = x
+        self.target_y = y
 
     def get_absolute_coords(self) -> List[Tuple[int, int]]:
         absolute_coords = []
@@ -39,7 +44,25 @@ class Block:
         new_block = copy.deepcopy(self)
         new_block.x += dx * distance
         new_block.y += dy * distance
+        new_block.target_x = new_block.x
+        new_block.target_y = new_block.y
         return new_block
+
+    def start_animation(self, target_x: int, target_y: int):
+        """بدء الرسوم المتحركة للقطعة"""
+        self.target_x = target_x
+        self.target_y = target_y
+        self.animation_progress = 0
+
+    def update_animation(self, speed: float = 0.2):
+        """تحديث الرسوم المتحركة"""
+        if self.animation_progress < 1.0:
+            self.animation_progress = min(1.0, self.animation_progress + speed)
+            # تحديث الموضع بناءً على التقدم
+            self.x = self.x + (self.target_x - self.x) * self.animation_progress
+            self.y = self.y + (self.target_y - self.y) * self.animation_progress
+            return True
+        return False
 
     def __repr__(self):
         return f"Block(Color: {self.color}, Pos: ({self.x}, {self.y}), Type: {self.movement_type.name})"
@@ -57,7 +80,13 @@ class Board:
     def get_exit_color(self, x: int, y: int) -> Union[str, None]:
         exit_info = self.exits.get((x, y))
         if exit_info:
-            return exit_info.get("color") # نرجع اللون فقط كما قبل
+            return exit_info.get("color")
+        return None
+
+    def get_exit_direction(self, x: int, y: int) -> Union[str, None]:
+        exit_info = self.exits.get((x, y))
+        if exit_info:
+            return exit_info.get("direction")
         return None
 
 class GameState:
@@ -67,6 +96,8 @@ class GameState:
         self.parent = parent  # للبحث والتراجع
         self.action = action  # الحركة التي أدت إلى هذه الحالة
         self.depth = depth  # عمق الحالة في شجرة البحث
+        self.selected_block_index = None  # للتحكم بالكيبورد
+        self.move_count = 0  # عدد الحركات
 
     def check_win_condition(self) -> bool:
         return len(self.blocks) == 0
@@ -103,6 +134,7 @@ class GameState:
                     if self._is_exit_move_valid(new_coords, block):
                         new_blocks = self.blocks[:block_index] + self.blocks[block_index+1:]
                         new_state = GameState(self.board, new_blocks, self, (block_index, dx, dy), self.depth + 1)
+                        new_state.move_count = self.move_count + 1
                         possible_moves.append((new_state, (block_index, dx, dy)))
                         break
                     
@@ -114,6 +146,7 @@ class GameState:
                     new_blocks = self.blocks[:]
                     new_blocks[block_index] = new_block
                     new_state = GameState(self.board, new_blocks, self, (block_index, dx, dy), self.depth + 1)
+                    new_state.move_count = self.move_count + 1
                     possible_moves.append((new_state, (block_index, dx, dy)))
         
         return possible_moves
@@ -177,3 +210,110 @@ class GameState:
             path.append(current)
             current = current.parent
         return list(reversed(path))
+    
+    def evaluate_state(self) -> float:
+        """
+        دالة تقييم (heuristic) لتقييم جودة الحالة
+        يمكن استخدامها في خوارزميات البحث مثل A*
+        """
+        if self.check_win_condition():
+            return 0.0  # الحالة المثالية
+        
+        score = 0.0
+        
+        # حساب المسافة بين كل قطعة والمخرج المناسب
+        for block in self.blocks:
+            min_distance = float('inf')
+            for (x, y), exit_info in self.board.exits.items():
+                if exit_info.get("color", "").lower() == block.color.lower():
+                    # حساب المسافة من مركز القطعة إلى المخرج
+                    block_center_x = block.x + sum(dx for dx, _ in block.shape) / len(block.shape)
+                    block_center_y = block.y + sum(dy for _, dy in block.shape) / len(block.shape)
+                    distance = abs(block_center_x - x) + abs(block_center_y - y)
+                    min_distance = min(min_distance, distance)
+            
+            # كلما كانت المسافة أصغر، كان التقييم أفضل
+            score += min_distance
+        
+        # إضافة عدد القطع المتبقية
+        score += len(self.blocks) * 10
+        
+        return score
+    
+    def get_keyboard_move(self, direction: str) -> Optional[Tuple[int, Tuple[int, int], int]]:
+        """
+        إرجاع حركة محتملة بناءً على اتجاه لوحة المفاتيح
+        تُستخدم للتحكم بالكيبورد
+        """
+        if self.selected_block_index is None or self.selected_block_index >= len(self.blocks):
+            return None
+        
+        block = self.blocks[self.selected_block_index]
+        
+        # تحديد اتجاه الحركة بناءً على المدخل
+        if direction == "UP":
+            dx, dy = 0, -1
+        elif direction == "DOWN":
+            dx, dy = 0, 1
+        elif direction == "LEFT":
+            dx, dy = -1, 0
+        elif direction == "RIGHT":
+            dx, dy = 1, 0
+        else:
+            return None
+        
+        # التحقق من أن الحركة متوافقة مع نوع القطعة
+        if not block.can_move((dx, dy)):
+            return None
+        
+        # البحث عن أقصى مسافة ممكنة في هذا الاتجاه
+        max_distance = 0
+        max_dist = max(self.board.width, self.board.height)
+        
+        for distance in range(1, max_dist + 1):
+            new_block = block.move((dx, dy), distance)
+            new_coords = set(new_block.get_absolute_coords())
+            
+            # التحقق من أن المسار خالٍ
+            if not self._is_path_clear(block, (dx, dy), distance):
+                break
+            
+            # التحقق من الخروج من اللوحة
+            if self._is_exit_move_valid(new_coords, block):
+                max_distance = distance
+                break
+            
+            # التحقق من التصادم
+            if self._is_collision(new_coords, self.selected_block_index):
+                break
+            
+            max_distance = distance
+        
+        if max_distance > 0:
+            return (self.selected_block_index, (dx, dy), max_distance)
+        
+        return None
+    
+    def select_next_block(self, forward: bool = True):
+        """
+        تحديد القطعة التالية أو السابقة للتحكم بالكيبورد
+        """
+        if not self.blocks:
+            return
+        
+        if self.selected_block_index is None:
+            self.selected_block_index = 0 if forward else len(self.blocks) - 1
+        else:
+            if forward:
+                self.selected_block_index = (self.selected_block_index + 1) % len(self.blocks)
+            else:
+                self.selected_block_index = (self.selected_block_index - 1) % len(self.blocks)
+    
+    def get_block_at(self, x: int, y: int) -> Optional[int]:
+        """
+        إرجاع فهرس القطعة في الموقع المحدد
+        """
+        for i, block in enumerate(self.blocks):
+            if (x, y) in block.get_absolute_coords():
+                return i
+        return None

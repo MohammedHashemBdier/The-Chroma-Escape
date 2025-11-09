@@ -1,9 +1,11 @@
 import pygame
-from model import GameState, Block, Board
+from model import GameState, Block, Board, MovementType
+import math
 
 CELL_SIZE = 80
 GRID_LINE_COLOR = (150, 150, 150)
 BACKGROUND_COLOR = (240, 240, 240) 
+ANIMATION_SPEED = 0.2
 
 # في ملف view.py
 
@@ -13,9 +15,9 @@ COLOR_MAP = {
     "yellow": (255, 255, 0),
     "gray": (100, 100, 100),
     "green": (0, 255, 0),
-    "purple": (128, 0, 128),  # <-- تم إضافة اللون البنفسجي
-    "orange": (255, 165, 0),  # <-- تم إضافة اللون البرتقالي
-    "cyan": (0, 255, 255),    # لون إضافي للمستقبل
+    "purple": (128, 0, 128),
+    "orange": (255, 165, 0),
+    "cyan": (0, 255, 255),
 }
 
 class GameVisualizer:
@@ -40,12 +42,16 @@ class GameVisualizer:
         except pygame.error:
             self.font = pygame.font.SysFont(None, 36)
             self.small_font = pygame.font.SysFont(None, 24)
+        
+        # لتخزين الرسوم المتحركة
+        self.animations = []
+        self.particles = []
 
-    def _draw_movement_arrow(self, block: Block):
-        arrow_color = (255, 255, 255)
+    def _draw_movement_arrow(self, block: Block, is_selected: bool = False):
+        arrow_color = (255, 255, 255) if is_selected else (200, 200, 200)
         arrow_size = CELL_SIZE // 4
-        center_x = block.x * CELL_SIZE + CELL_SIZE // 2
-        center_y = block.y * CELL_SIZE + CELL_SIZE // 2
+        center_x = int(block.x * CELL_SIZE + CELL_SIZE // 2)
+        center_y = int(block.y * CELL_SIZE + CELL_SIZE // 2)
         
         if block.movement_type.name == 'ANY':
             pygame.draw.line(self.screen, arrow_color, (center_x - arrow_size, center_y), (center_x + arrow_size, center_y), 5)
@@ -62,11 +68,24 @@ class GameVisualizer:
             pygame.draw.polygon(self.screen, arrow_color, [(center_x, center_y + arrow_size), (center_x - 5, center_y + arrow_size - 5), (center_x + 5, center_y + arrow_size - 5)])
             pygame.draw.polygon(self.screen, arrow_color, [(center_x, center_y - arrow_size), (center_x - 5, center_y - arrow_size + 5), (center_x + 5, center_y - arrow_size + 5)])
 
-    def _draw_cell(self, x: int, y: int, color: tuple, is_selected: bool = False):
-        left = x * CELL_SIZE
-        top = y * CELL_SIZE
+    def _draw_cell(self, x: int, y: int, color: tuple, is_selected: bool = False, is_valid_move: bool = False):
+        left = int(x * CELL_SIZE)
+        top = int(y * CELL_SIZE)
         
-        pygame.draw.rect(self.screen, color, (left, top, CELL_SIZE, CELL_SIZE))
+        # تعديل اللون بناءً على الحالة
+        if is_selected:
+            # إضافة تأثير توهج للقطعة المحددة
+            glow_color = tuple(min(255, c + 50) for c in color)
+            pygame.draw.rect(self.screen, glow_color, (left-2, top-2, CELL_SIZE+4, CELL_SIZE+4))
+            pygame.draw.rect(self.screen, color, (left, top, CELL_SIZE, CELL_SIZE))
+        elif is_valid_move:
+            # إضافة تأثير شفاف للحركات الممكنة
+            s = pygame.Surface((CELL_SIZE, CELL_SIZE))
+            s.set_alpha(128)
+            s.fill(color)
+            self.screen.blit(s, (left, top))
+        else:
+            pygame.draw.rect(self.screen, color, (left, top, CELL_SIZE, CELL_SIZE))
 
         border_thickness = 3 if is_selected else 1
         border_color = (0, 0, 0) if is_selected else GRID_LINE_COLOR
@@ -156,7 +175,7 @@ class GameVisualizer:
         
         pygame.display.flip()
     
-    def draw_ui(self, state: GameState, move_count=0, message=""):
+    def draw_ui(self, state: GameState, move_count=0, message="", control_mode="mouse"):
         """رسم واجهة المستخدم"""
         # عرض عدد الحركات
         moves_text = self.small_font.render(f"Moves: {move_count}", True, (0, 0, 0))
@@ -173,41 +192,93 @@ class GameVisualizer:
             self.screen.blit(msg_text, msg_rect)
         
         # عرض تعليمات
-        instructions = [
-            "Click and drag to move blocks",
-            "Press U to undo last move",
-            "Press R to restart level",
-            "Press ESC to quit"
-        ]
+        if control_mode == "keyboard":
+            instructions = [
+                "Use TAB to select blocks",
+                "Use ARROW KEYS or WASD to move",
+                "Press U to undo last move",
+                "Press R to restart level",
+                "Press M to switch to mouse control",
+                "Press ESC to quit"
+            ]
+        else:
+            instructions = [
+                "Click and drag to move blocks",
+                "Press K to switch to keyboard control",
+                "Press U to undo last move",
+                "Press R to restart level",
+                "Press ESC to quit"
+            ]
         
-        y_pos = self.screen_height - 100
+        y_pos = self.screen_height - 120
         for instruction in instructions:
             inst_text = self.small_font.render(instruction, True, (0, 0, 0))
             self.screen.blit(inst_text, (10, y_pos))
             y_pos += 25
     
-    def draw(self, state: GameState, selected_block_coords: set = None, move_count=0, message=""):
+    def _draw_particles(self):
+        """رسم الجسيمات للرسوم المتحركة"""
+        for particle in self.particles[:]:
+            particle['life'] -= 1
+            if particle['life'] <= 0:
+                self.particles.remove(particle)
+                continue
+            
+            # تحديث موقع الجسيم
+            particle['x'] += particle['dx']
+            particle['y'] += particle['dy']
+            
+            # رسم الجسيم
+            pygame.draw.circle(
+                self.screen, 
+                particle['color'], 
+                (int(particle['x']), int(particle['y'])), 
+                particle['size']
+            )
+    
+    def _create_exit_particles(self, x: int, y: int, color: tuple):
+        """إنشاء جسيمات عند خروج القطعة"""
+        center_x = x * CELL_SIZE + CELL_SIZE // 2
+        center_y = y * CELL_SIZE + CELL_SIZE // 2
+        
+        for _ in range(20):
+            angle = math.radians(math.random() * 360)
+            speed = math.random() * 3 + 1
+            self.particles.append({
+                'x': center_x,
+                'y': center_y,
+                'dx': math.cos(angle) * speed,
+                'dy': math.sin(angle) * speed,
+                'color': color,
+                'size': math.random() * 5 + 2,
+                'life': 30
+            })
+    
+    def draw(self, state: GameState, selected_block_coords: set = None, move_count=0, message="", control_mode="mouse"):
         self.screen.fill(BACKGROUND_COLOR)
         
-        # رسم الشبطة والحواجز
+        # رسم الشبكة والحواجز
         for x, y in state.board.barriers:
             self._draw_cell(x, y, COLOR_MAP['gray'])
             
         # رسم القطع
-        for block in state.blocks:
+        for i, block in enumerate(state.blocks):
             color = COLOR_MAP.get(block.color.lower(), (0, 0, 0))
             
-            is_selected = set(block.get_absolute_coords()) == selected_block_coords
+            is_selected = (i == state.selected_block_index) or (set(block.get_absolute_coords()) == selected_block_coords)
             
             for x, y in block.get_absolute_coords():
                 self._draw_cell(x, y, color, is_selected=is_selected)
 
-            self._draw_movement_arrow(block)
-
+            self._draw_movement_arrow(block, is_selected=is_selected)
+        
+        # رسم الجسيمات
+        self._draw_particles()
+        
         self._draw_grid(state.board.exits)
         
         # رسم واجهة المستخدم
-        self.draw_ui(state, move_count, message)
+        self.draw_ui(state, move_count, message, control_mode)
         
         pygame.display.flip()
     
