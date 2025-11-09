@@ -1,18 +1,63 @@
 from model import GameState, MovementType, Block, Board
 import json
+import copy
 
 class GameLogic:
-    
-    def _get_allowed_directions(self, movement_type: MovementType) -> list:
-        directions = []
-        if movement_type in [MovementType.HORIZONTAL, MovementType.ANY]:
-            directions.extend([(1, 0), (-1, 0)])
-        
-        if movement_type in [MovementType.VERTICAL, MovementType.ANY]:
-            directions.extend([(0, 1), (0, -1)])
-            
-        return directions
+    def __init__(self):
+        self.move_history = []  # لتخزين تاريخ الحركات للتراجع
 
+    def try_move_manual(self, current_state: GameState, block_index: int, direction_vector: tuple, distance: int) -> GameState:
+        if distance <= 0:
+            return current_state
+
+        block = current_state.blocks[block_index]
+        dx, dy = direction_vector
+        board = current_state.board
+
+        # التحقق من أن الحركة متوافقة مع نوع القطعة
+        if (dx != 0 and block.movement_type == MovementType.VERTICAL) or \
+           (dy != 0 and block.movement_type == MovementType.HORIZONTAL):
+            return current_state
+
+        # التحقق من أن المسار خالٍ
+        if not self._is_path_clear(current_state, block_index, dx, dy, distance):
+            return current_state 
+
+        final_x = block.x + dx * distance
+        final_y = block.y + dy * distance
+        
+        moved_block = Block(
+            color=block.color, 
+            x=final_x, 
+            y=final_y, 
+            shape=block.shape, 
+            movement_type=block.movement_type
+        )
+        final_coords = set(moved_block.get_absolute_coords())
+
+        # التحقق من الخروج من اللوحة
+        if self._is_exit_move_valid(final_coords, block, board):
+            new_state = self._create_new_state_after_exit(current_state, block_index)
+            self.move_history.append((current_state, (block_index, dx, dy, distance)))
+            return new_state
+
+        # التحقق من أن الحركة داخل اللوحة
+        for x, y in final_coords:
+            if not (0 <= x < board.width and 0 <= y < board.height):
+                return current_state 
+
+        new_state = self._create_new_state_after_move(current_state, block_index, moved_block)
+        self.move_history.append((current_state, (block_index, dx, dy, distance)))
+        return new_state
+    
+    def undo_move(self, current_state: GameState) -> GameState:
+        """التراجع عن آخر حركة"""
+        if not self.move_history:
+            return current_state
+        
+        previous_state, _ = self.move_history.pop()
+        return previous_state
+    
     def _is_path_clear(self, current_state: GameState, moving_block_index: int, dx: int, dy: int, distance: int) -> bool:
         block = current_state.blocks[moving_block_index]
         board = current_state.board
@@ -24,7 +69,6 @@ class GameLogic:
                 obstacle_coords.update(other_block.get_absolute_coords())
         
         for step in range(1, distance + 1):
-            
             check_x = block.x + dx * step
             check_y = block.y + dy * step
             
@@ -44,53 +88,43 @@ class GameLogic:
                 
         return True
         
-    def try_move_manual(self, current_state: GameState, block_index: int, direction_vector: tuple, distance: int) -> GameState:
-        if distance <= 0:
-            return current_state
+    def _is_exit_move_valid(self, new_coords: set, block: Block, board: Board) -> bool:
+        for x, y in new_coords:
+            exit_color = board.get_exit_color(x, y)
+            
+            if exit_color is not None and exit_color.lower() == block.color.lower():
+                return True
+            
+        return False
 
-        block = current_state.blocks[block_index]
-        dx, dy = direction_vector
-        board = current_state.board
-
-        if (dx != 0 and block.movement_type == MovementType.VERTICAL) or \
-           (dy != 0 and block.movement_type == MovementType.HORIZONTAL):
-            return current_state
-
-        if not self._is_path_clear(current_state, block_index, dx, dy, distance):
-             return current_state 
-
-        final_x = block.x + dx * distance
-        final_y = block.y + dy * distance
+    def _create_new_state_after_move(self, current_state: GameState, block_index: int, moved_block: Block) -> GameState:
+        new_blocks = current_state.blocks[:]
+        new_blocks[block_index] = moved_block
         
-        moved_block = Block(
-            color=block.color, 
-            x=final_x, 
-            y=final_y, 
-            shape=block.shape, 
-            movement_type=block.movement_type
-        )
-        final_coords = set(moved_block.get_absolute_coords())
-
-        if self._is_exit_move_valid(final_coords, block, board):
-            return self._create_new_state_after_exit(current_state, block_index)
-
-        for x, y in final_coords:
-            if not (0 <= x < board.width and 0 <= y < board.height):
-                return current_state 
-
-        return self._create_new_state_after_move(current_state, block_index, moved_block)
+        return GameState(board=current_state.board, blocks=new_blocks)
+    
+    def _create_new_state_after_exit(self, current_state: GameState, block_index: int) -> GameState:
+        new_blocks = current_state.blocks[:]
+        new_blocks.pop(block_index)
+        
+        return GameState(board=current_state.board, blocks=new_blocks)
     
     def get_possible_moves(self, current_state: GameState) -> list:
+        """إرجاع قائمة بالحالات الممكنة بعد كل حركة"""
         possible_next_states = []
         board = current_state.board
         max_dist = max(board.width, board.height) 
 
         for block_index, block in enumerate(current_state.blocks):
-            
-            for dx, dy in self._get_allowed_directions(block.movement_type):
+            # تحديد الاتجاهات المسموح بها
+            directions = []
+            if block.movement_type in [MovementType.HORIZONTAL, MovementType.ANY]:
+                directions.extend([(1, 0), (-1, 0)])
+            if block.movement_type in [MovementType.VERTICAL, MovementType.ANY]:
+                directions.extend([(0, 1), (0, -1)])
                 
+            for dx, dy in directions:
                 for distance in range(1, max_dist):
-                    
                     final_x = block.x + dx * distance
                     final_y = block.y + dy * distance
                     
@@ -126,17 +160,7 @@ class GameLogic:
                         break
 
         return possible_next_states
-
-    def _is_exit_move_valid(self, new_coords: set, block: Block, board: Board) -> bool:
-        
-        for x, y in new_coords:
-            exit_color = board.get_exit_color(x, y)
-            
-            if exit_color is not None and exit_color.lower() == block.color.lower():
-                return True
-            
-        return False
-
+    
     def _is_collision(self, new_coords: set, current_state: GameState, moving_block_index: int) -> bool:
         board = current_state.board
         
@@ -157,23 +181,7 @@ class GameLogic:
                 
         return False
 
-    def _create_new_state_after_move(self, current_state: GameState, block_index: int, moved_block: Block) -> GameState:
-        new_blocks = current_state.blocks[:]
-        
-        new_blocks[block_index] = moved_block
-        
-        return GameState(board=current_state.board, blocks=new_blocks)
-    
-    def _create_new_state_after_exit(self, current_state: GameState, block_index: int) -> GameState:
-        new_blocks = current_state.blocks[:]
-        
-        new_blocks.pop(block_index)
-        
-        return GameState(board=current_state.board, blocks=new_blocks)
-    
-
 def load_game_state(file_path: str) -> GameState:
-
     try:
         with open(file_path, 'r') as f:
             data = json.load(f)
