@@ -247,3 +247,22 @@ class GameState:
             if (x, y) in block.get_absolute_coords():
                 return i
         return None
+
+    def get_trapped_block_indices(self) -> List[int]:
+        trapped_indices = []
+        for i, block in enumerate(self.blocks):
+            is_trapped = True
+            directions = []
+            if block.movement_type in [MovementType.HORIZONTAL, MovementType.ANY]:
+                directions.extend([(1, 0), (-1, 0)])
+            if block.movement_type in [MovementType.VERTICAL, MovementType.ANY]:
+                directions.extend([(0, 1), (0, -1)])
+
+            for dx, dy in directions:
+                if self._is_path_clear(block, (dx, dy), 1):
+                    is_trapped = False
+                    break
+            
+            if is_trapped:
+                trapped_indices.append(i)
+        return trapped_indices

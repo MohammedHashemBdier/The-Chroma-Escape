@@ -188,8 +188,10 @@ def run_game(level_index=0):
         selected_coords = None
         if selected_block_index is not None:
              selected_coords = set(current_state.blocks[selected_block_index].get_absolute_coords())
+        
+        trapped_indices = current_state.get_trapped_block_indices()
              
-        viz.draw(current_state, selected_block_coords=selected_coords, move_count=move_count, message=message, control_mode=control_mode)
+        viz.draw(current_state, selected_block_coords=selected_coords, move_count=move_count, message=message, control_mode=control_mode, trapped_block_indices=trapped_indices)
         viz.clock.tick(60)
         
     pygame.quit()

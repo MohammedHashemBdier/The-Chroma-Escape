@@ -269,7 +269,7 @@ class GameVisualizer:
                 'life': 30
             })
 
-    def draw(self, state: GameState, selected_block_coords: set = None, move_count=0, message="", control_mode="mouse"):
+    def draw(self, state: GameState, selected_block_coords: set = None, move_count=0, message="", control_mode="mouse", trapped_block_indices=None):
         self.screen.fill(BACKGROUND_COLOR)
         
         for x, y in state.board.barriers:
@@ -279,7 +279,12 @@ class GameVisualizer:
             self._draw_possible_moves(state, state.selected_block_index)
             
         for i, block in enumerate(state.blocks):
-            color = COLOR_MAP.get(block.color.lower(), (0, 0, 0))
+            base_color = COLOR_MAP.get(block.color.lower(), (0, 0, 0))
+            color = base_color
+            
+            if trapped_block_indices and i in trapped_block_indices:
+                color = tuple(c // 2 for c in base_color)
+            
             is_selected = (i == state.selected_block_index) or (set(block.get_absolute_coords()) == selected_block_coords)
             
             for x, y in block.get_absolute_coords():
