@@ -1,18 +1,17 @@
+import pygame
 from model import GameState, MovementType, Block, Board
 import json
 import copy
 
-# ثوابت لحالة الحركة
 MOVE_SUCCESS = "success"
 MOVE_INVALID = "invalid"
 MOVE_EXIT = "exit"
 
 class GameLogic:
     def __init__(self):
-        self.move_history = []  # لتخزين تاريخ الحركات للتراجع
+        self.move_history = []
 
     def try_move_manual(self, current_state: GameState, block_index: int, direction_vector: tuple, distance: int) -> tuple:
-        """محاولة تحريك قطعة يدوياً. تُرجع (new_state, status)"""
         if distance <= 0:
             return (current_state, MOVE_INVALID)
 
@@ -50,7 +49,6 @@ class GameLogic:
         return (new_state, MOVE_SUCCESS)
     
     def try_move_keyboard(self, current_state: GameState, direction: str) -> tuple:
-        """محاولة تحريك القطعة المحددة باستخدام لوحة المفاتيح. تُرجع (new_state, status)"""
         move_info = current_state.get_keyboard_move(direction)
         if move_info is None:
             return (current_state, MOVE_INVALID)
@@ -59,13 +57,11 @@ class GameLogic:
         return self.try_move_manual(current_state, block_index, (dx, dy), distance)
     
     def select_next_block(self, current_state: GameState, forward: bool = True) -> GameState:
-        """تحديد القطعة التالية أو السابقة للتحكم بالكيبورد"""
         new_state = copy.deepcopy(current_state)
         new_state.select_next_block(forward)
         return new_state
     
     def select_block_at(self, current_state: GameState, x: int, y: int) -> GameState:
-        """تحديد القطعة في الموقع المحدد"""
         block_index = current_state.get_block_at(x, y)
         if block_index is not None:
             new_state = copy.deepcopy(current_state)
@@ -74,12 +70,59 @@ class GameLogic:
         return current_state
     
     def undo_move(self, current_state: GameState) -> tuple:
-        """التراجع عن آخر حركة، تُرجع (new_state, status)"""
         if not self.move_history:
             return (current_state, MOVE_INVALID)
         
         previous_state, _ = self.move_history.pop()
         return (previous_state, MOVE_SUCCESS)
+    
+    def get_solution_path(self, initial_state: GameState, max_depth=50):
+        visited = set()
+        stack = [(initial_state, [])]
+        
+        while stack:
+            current_state, path = stack.pop()
+            
+            if current_state.check_win_condition():
+                return path
+                
+            if len(path) >= max_depth:
+                continue
+                
+            state_key = current_state.get_hashable_key()
+            if state_key in visited:
+                continue
+                
+            visited.add(state_key)
+            
+            possible_next_states = self.get_possible_moves(current_state)
+            for next_state, action in possible_next_states:
+                new_path = path + [action]
+                stack.append((next_state, new_path))
+        
+        return None
+
+    def auto_solve(self, initial_state: GameState, visualizer, delay=500):
+        solution_path = self.get_solution_path(initial_state)
+        
+        if solution_path is None:
+            return False
+        
+        current_state = initial_state
+        
+        for step, action in enumerate(solution_path):
+            block_index, dx, dy, distance = action
+            
+            current_state, status = self.try_move_manual(current_state, block_index, (dx, dy), distance)
+            
+            if visualizer:
+                visualizer.draw(current_state, move_count=step+1)
+                pygame.time.wait(delay)
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        return False
+        
+        return True
     
     def _is_path_clear(self, current_state: GameState, moving_block_index: int, dx: int, dy: int, distance: int) -> bool:
         block = current_state.blocks[moving_block_index]
@@ -137,7 +180,6 @@ class GameLogic:
         return new_state
     
     def get_possible_moves(self, current_state: GameState) -> list:
-        """إرجاع قائمة بالحالات الممكنة بعد كل حركة"""
         possible_next_states = []
         board = current_state.board
         max_dist = max(board.width, board.height) 
@@ -151,6 +193,9 @@ class GameLogic:
                 
             for dx, dy in directions:
                 for distance in range(1, max_dist):
+                    if not self._is_path_clear(current_state, block_index, dx, dy, distance):
+                        break
+                    
                     final_x = block.x + dx * distance
                     final_y = block.y + dy * distance
                     
@@ -160,12 +205,9 @@ class GameLogic:
                     )
                     final_coords = set(moved_block.get_absolute_coords())
                     
-                    if not self._is_path_clear(current_state, block_index, dx, dy, distance):
-                        break
-                    
                     if self._is_exit_move_valid(final_coords, block, board):
                         new_state = self._create_new_state_after_exit(current_state, block_index)
-                        possible_next_states.append(new_state)
+                        possible_next_states.append((new_state, (block_index, dx, dy, distance)))
                         break
                     
                     if not self._is_collision(final_coords, current_state, block_index):
@@ -178,7 +220,7 @@ class GameLogic:
                                 break
                         
                         if not is_out_of_bounds:
-                            possible_next_states.append(new_state)
+                            possible_next_states.append((new_state, (block_index, dx, dy, distance)))
                     else:
                         break
 

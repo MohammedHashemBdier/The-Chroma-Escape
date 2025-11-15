@@ -40,6 +40,7 @@ def run_game(level_index=0):
     message = ""
     control_mode = "mouse"
     initial_state = current_state
+    auto_solving = False
     
     while running:
         if current_state.check_win_condition():
@@ -84,6 +85,17 @@ def run_game(level_index=0):
                 elif event.key == pygame.K_k:
                     control_mode = "keyboard"
                     message = "Switched to keyboard control"
+                elif event.key == pygame.K_a:
+                    if not auto_solving:
+                        message = "Searching for solution..."
+                        solution_path = logic.get_solution_path(current_state)
+                        if solution_path:
+                            message = f"Solution found with {len(solution_path)} steps"
+                            auto_solving = True
+                            logic.auto_solve(current_state, viz, delay=300)
+                            current_state.check_win_condition()
+                        else:
+                            message = "No solution found"
                 
                 elif control_mode == "keyboard":
                     if event.key == pygame.K_TAB:

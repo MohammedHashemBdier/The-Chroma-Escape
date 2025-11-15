@@ -1,6 +1,7 @@
 import pygame
 from model import GameState, Block, Board, MovementType
 import math
+import random
 
 CELL_SIZE = 80
 GRID_LINE_COLOR = (150, 150, 150)
@@ -59,6 +60,52 @@ class GameVisualizer:
             pygame.draw.line(self.screen, arrow_color, (center_x, center_y - arrow_size), (center_x, center_y + arrow_size), 5)
             pygame.draw.polygon(self.screen, arrow_color, [(center_x, center_y + arrow_size), (center_x - 5, center_y + arrow_size - 5), (center_x + 5, center_y + arrow_size - 5)])
             pygame.draw.polygon(self.screen, arrow_color, [(center_x, center_y - arrow_size), (center_x - 5, center_y - arrow_size + 5), (center_x + 5, center_y - arrow_size + 5)])
+
+    def _draw_possible_moves(self, state: GameState, selected_block_index: int):
+        if selected_block_index is None or selected_block_index >= len(state.blocks):
+            return
+            
+        block = state.blocks[selected_block_index]
+        possible_moves = []
+        
+        if block.movement_type in [MovementType.HORIZONTAL, MovementType.ANY]:
+            possible_moves.extend([(-1, 0), (1, 0)])
+        if block.movement_type in [MovementType.VERTICAL, MovementType.ANY]:
+            possible_moves.extend([(0, -1), (0, 1)])
+        
+        for dx, dy in possible_moves:
+            arrow_x = block.x + dx * 2
+            arrow_y = block.y + dy * 2
+            
+            if 0 <= arrow_x < state.board.width and 0 <= arrow_y < state.board.height:
+                center_x = arrow_x * CELL_SIZE + CELL_SIZE // 2
+                center_y = arrow_y * CELL_SIZE + CELL_SIZE // 2
+                
+                s = pygame.Surface((CELL_SIZE, CELL_SIZE))
+                s.set_alpha(100)
+                s.fill((100, 200, 100))
+                self.screen.blit(s, (arrow_x * CELL_SIZE, arrow_y * CELL_SIZE))
+                
+                if dx > 0:
+                    pygame.draw.polygon(self.screen, (0, 150, 0), 
+                                       [(center_x + 10, center_y), 
+                                        (center_x - 5, center_y - 8), 
+                                        (center_x - 5, center_y + 8)])
+                elif dx < 0:
+                    pygame.draw.polygon(self.screen, (0, 150, 0), 
+                                       [(center_x - 10, center_y), 
+                                        (center_x + 5, center_y - 8), 
+                                        (center_x + 5, center_y + 8)])
+                elif dy > 0:
+                    pygame.draw.polygon(self.screen, (0, 150, 0), 
+                                       [(center_x, center_y + 10), 
+                                        (center_x - 8, center_y - 5), 
+                                        (center_x + 8, center_y - 5)])
+                elif dy < 0:
+                    pygame.draw.polygon(self.screen, (0, 150, 0), 
+                                       [(center_x, center_y - 10), 
+                                        (center_x - 8, center_y + 5), 
+                                        (center_x + 8, center_y + 5)])
 
     def _draw_cell(self, x: int, y: int, color: tuple, is_selected: bool = False, is_valid_move: bool = False):
         left = int(x * CELL_SIZE)
@@ -169,6 +216,7 @@ class GameVisualizer:
                 "Press U to undo last move",
                 "Press R to restart level",
                 "Press M to switch to mouse control",
+                "Press A to auto-solve",
                 "Press ESC to quit"
             ]
         else:
@@ -177,10 +225,11 @@ class GameVisualizer:
                 "Press K to switch to keyboard control",
                 "Press U to undo last move",
                 "Press R to restart level",
+                "Press A to auto-solve",
                 "Press ESC to quit"
             ]
         
-        y_pos = self.screen_height - 120
+        y_pos = self.screen_height - 140
         for instruction in instructions:
             inst_text = self.small_font.render(instruction, True, (0, 0, 0))
             self.screen.blit(inst_text, (10, y_pos))
@@ -208,15 +257,15 @@ class GameVisualizer:
         center_y = y * CELL_SIZE + CELL_SIZE // 2
         
         for _ in range(20):
-            angle = math.radians(math.random() * 360)
-            speed = math.random() * 3 + 1
+            angle = math.radians(random.random() * 360)
+            speed = random.random() * 3 + 1
             self.particles.append({
                 'x': center_x,
                 'y': center_y,
                 'dx': math.cos(angle) * speed,
                 'dy': math.sin(angle) * speed,
                 'color': color,
-                'size': math.random() * 5 + 2,
+                'size': random.random() * 5 + 2,
                 'life': 30
             })
 
@@ -225,6 +274,9 @@ class GameVisualizer:
         
         for x, y in state.board.barriers:
             self._draw_cell(x, y, COLOR_MAP['gray'])
+        
+        if control_mode == "keyboard" and state.selected_block_index is not None:
+            self._draw_possible_moves(state, state.selected_block_index)
             
         for i, block in enumerate(state.blocks):
             color = COLOR_MAP.get(block.color.lower(), (0, 0, 0))
