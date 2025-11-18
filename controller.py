@@ -41,13 +41,13 @@ class GameLogic:
            (dy != 0 and block.movement_type == MovementType.HORIZONTAL):
             return (current_state, MOVE_INVALID)
 
+        if not current_state._is_path_clear_for_distance(block, (dx, dy), distance, block_index):
+            return (current_state, MOVE_INVALID)
+
         if board.would_be_adjacent_to_exit_after_move(block, (dx, dy), distance):
             new_state = self._create_new_state_after_exit(current_state, block_index)
             self.move_history.append((current_state, (block_id, dx, dy, distance)))
             return (new_state, MOVE_EXIT)
-
-        if not current_state._is_path_clear_for_distance(block, (dx, dy), distance, block_index):
-            return (current_state, MOVE_INVALID)
 
         final_x = block.x + dx * distance
         final_y = block.y + dy * distance

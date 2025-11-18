@@ -134,9 +134,7 @@ class GameVisualizer:
             final_color = tuple(c // 4 for c in color)
         elif is_locked:
             r, g, b = color
-            grey = (r + g + b) / 3
-            final_color = (int((r + grey) / 2.5), int((g + grey) / 2.5), int((b + grey) / 2.5))
-
+            final_color = (int(r * 0.7), int(g * 0.7), int(b * 0.7))  # أفتح بنسبة 70%
         if is_selected:
             glow_color = tuple(min(255, c + 50) for c in final_color)
             pygame.draw.rect(self.screen, glow_color, (left-2, top-2, self.CELL_SIZE+4, self.CELL_SIZE+4))
@@ -351,7 +349,7 @@ class GameVisualizer:
             
             color = base_color
             if is_trapped_by_obstacles:
-                color = tuple(c // 4 for c in base_color)
+                color = tuple(c // 0.6 for c in base_color)
             elif is_locked:
                 r, g, b = base_color
                 grey = (r + g + b) / 3
