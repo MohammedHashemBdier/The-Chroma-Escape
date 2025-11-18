@@ -162,33 +162,74 @@ class GameVisualizer:
             y_pos = y * self.CELL_SIZE
             pygame.draw.line(self.screen, GRID_LINE_COLOR, (0, y_pos), (self.screen_width, y_pos), 1)
 
-        border_thickness = 4
-        border_color = (50, 50, 50)
-        pygame.draw.rect(self.screen, border_color, (0, 0, self.screen_width, self.screen_height), border_thickness)
-
-        exit_thickness = 8 
+        border_thickness = self.CELL_SIZE / 2 # Same thickness as cells
+        default_border_color = (50, 50, 50)
+        
+        exit_positions = set(exits.keys())
+        
+        for x in range(self.width):
+            if (x, 0) in exit_positions:
+                exit_color = COLOR_MAP.get(exits[(x, 0)]["color"].lower(), (200, 200, 200))
+                pygame.draw.rect(self.screen, exit_color, (x * self.CELL_SIZE, 0, self.CELL_SIZE, border_thickness))
+            else:
+                pygame.draw.rect(self.screen, default_border_color, (x * self.CELL_SIZE, 0, self.CELL_SIZE, border_thickness))
+        
+        for x in range(self.width):
+            if (x, self.height - 1) in exit_positions:
+                exit_color = COLOR_MAP.get(exits[(x, self.height - 1)]["color"].lower(), (200, 200, 200))
+                pygame.draw.rect(self.screen, exit_color, (x * self.CELL_SIZE, self.screen_height - border_thickness, self.CELL_SIZE, border_thickness))
+            else:
+                pygame.draw.rect(self.screen, default_border_color, (x * self.CELL_SIZE, self.screen_height - border_thickness, self.CELL_SIZE, border_thickness))
+        
+        for y in range(self.height):
+            if (0, y) in exit_positions:
+                exit_color = COLOR_MAP.get(exits[(0, y)]["color"].lower(), (200, 200, 200))
+                pygame.draw.rect(self.screen, exit_color, (0, y * self.CELL_SIZE, border_thickness, self.CELL_SIZE))
+            else:
+                pygame.draw.rect(self.screen, default_border_color, (0, y * self.CELL_SIZE, border_thickness, self.CELL_SIZE))
+        
+        for y in range(self.height):
+            if (self.width - 1, y) in exit_positions:
+                exit_color = COLOR_MAP.get(exits[(self.width - 1, y)]["color"].lower(), (200, 200, 200))
+                pygame.draw.rect(self.screen, exit_color, (self.screen_width - border_thickness, y * self.CELL_SIZE, border_thickness, self.CELL_SIZE))
+            else:
+                pygame.draw.rect(self.screen, default_border_color, (self.screen_width - border_thickness, y * self.CELL_SIZE, border_thickness, self.CELL_SIZE))
         
         for (x, y), exit_info in exits.items():
             color = COLOR_MAP.get(exit_info["color"].lower(), (200, 200, 200))
-            is_on_edge = (x == 0 or x == self.width - 1 or y == 0 or y == self.height - 1)
-
-            if is_on_edge:
-                if x == 0:
-                    start_pos = (0, y * self.CELL_SIZE)
-                    end_pos = (0, (y + 1) * self.CELL_SIZE)
-                    pygame.draw.line(self.screen, color, start_pos, end_pos, exit_thickness)
-                elif x == self.width - 1:
-                    start_pos = (self.screen_width, y * self.CELL_SIZE)
-                    end_pos = (self.screen_width, (y + 1) * self.CELL_SIZE)
-                    pygame.draw.line(self.screen, color, start_pos, end_pos, exit_thickness)
-                elif y == 0:
-                    start_pos = (x * self.CELL_SIZE, 0)
-                    end_pos = ((x + 1) * self.CELL_SIZE, 0)
-                    pygame.draw.line(self.screen, color, start_pos, end_pos, exit_thickness)
-                elif y == self.height - 1:
-                    start_pos = (x * self.CELL_SIZE, self.screen_height)
-                    end_pos = ((x + 1) * self.CELL_SIZE, self.screen_height)
-                    pygame.draw.line(self.screen, color, start_pos, end_pos, exit_thickness)
+            
+            if x == 0:  
+                center_x = border_thickness // 2
+                center_y = y * self.CELL_SIZE + self.CELL_SIZE // 2
+                pygame.draw.polygon(self.screen, (255, 255, 255), [
+                    (center_x - border_thickness // 3, center_y),
+                    (center_x + border_thickness // 3, center_y - border_thickness // 4),
+                    (center_x + border_thickness // 3, center_y + border_thickness // 4)
+                ])
+            elif x == self.width - 1:  
+                center_x = self.screen_width - border_thickness // 2
+                center_y = y * self.CELL_SIZE + self.CELL_SIZE // 2
+                pygame.draw.polygon(self.screen, (255, 255, 255), [
+                    (center_x + border_thickness // 3, center_y),
+                    (center_x - border_thickness // 3, center_y - border_thickness // 4),
+                    (center_x - border_thickness // 3, center_y + border_thickness // 4)
+                ])
+            elif y == 0: 
+                center_x = x * self.CELL_SIZE + self.CELL_SIZE // 2
+                center_y = border_thickness // 2
+                pygame.draw.polygon(self.screen, (255, 255, 255), [
+                    (center_x, center_y - border_thickness // 3),
+                    (center_x - border_thickness // 4, center_y + border_thickness // 3),
+                    (center_x + border_thickness // 4, center_y + border_thickness // 3)
+                ])
+            elif y == self.height - 1: 
+                center_x = x * self.CELL_SIZE + self.CELL_SIZE // 2
+                center_y = self.screen_height - border_thickness // 2
+                pygame.draw.polygon(self.screen, (255, 255, 255), [
+                    (center_x, center_y + border_thickness // 3),
+                    (center_x - border_thickness // 4, center_y - border_thickness // 3),
+                    (center_x + border_thickness // 4, center_y - border_thickness // 3)
+                ])
                 
     def draw_win_screen(self, move_count=0):
         WIN_COLOR = (124, 252, 0)
@@ -327,6 +368,7 @@ class GameVisualizer:
         
         self._draw_particles()
         self._draw_grid(state.board.exits)
+        
         self.draw_ui(state, move_count, message, control_mode)
         
         pygame.display.flip()

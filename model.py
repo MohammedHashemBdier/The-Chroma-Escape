@@ -59,6 +59,38 @@ class Board:
         if exit_info:
             return exit_info.get("color")
         return None
+    
+    def is_exit_at(self, x: int, y: int) -> bool:
+        return (x, y) in self.exits
+    
+    def is_adjacent_to_exit(self, x: int, y: int, color: str) -> bool:
+        for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
+            exit_x, exit_y = x + dx, y + dy
+            if (exit_x, exit_y) in self.exits:
+                exit_color = self.exits[(exit_x, exit_y)].get("color")
+                if exit_color and exit_color.lower() == color.lower():
+                    return True
+        return False
+    
+    def would_be_adjacent_to_exit_after_move(self, block: Block, direction: Tuple[int, int], distance: int) -> bool:
+        dx, dy = direction
+        
+        for shape_dx, shape_dy in block.shape:
+            new_x = block.x + dx * distance + shape_dx
+            new_y = block.y + dy * distance + shape_dy
+            
+            if self.is_adjacent_to_exit(new_x, new_y, block.color):
+                return True
+        
+        return False
+    
+    def is_touching_exit_now(self, block: Block) -> bool:
+        for x, y in block.get_absolute_coords():
+            if (x, y) in self.exits:
+                exit_color = self.exits[(x, y)].get("color")
+                if exit_color and exit_color.lower() == block.color.lower():
+                    return True
+        return False
 
 class GameState:
     def __init__(self, board: Board, blocks: List[Block], parent=None, action=None, depth=0):
@@ -102,13 +134,7 @@ class GameState:
             
             for dx, dy in directions:
                 for distance in range(1, max_dist):
-                    if not self._is_path_clear(block, (dx, dy), distance):
-                        break
-                    
-                    new_block = block.move((dx, dy), distance)
-                    new_coords = set(new_block.get_absolute_coords())
-                    
-                    if self._is_exit_move_valid(new_coords, block):
+                    if self.board.would_be_adjacent_to_exit_after_move(block, (dx, dy), distance):
                         new_blocks = copy.deepcopy(self.blocks)
                         new_blocks.pop(block_index)
                         new_state = GameState(self.board, new_blocks, self, (block.id, dx, dy), self.depth + 1)
@@ -118,9 +144,10 @@ class GameState:
                         possible_moves.append((new_state, (block.id, dx, dy, distance)))
                         break
                     
-                    if self._is_collision(new_coords, block_index):
+                    if not self._is_path_clear_for_distance(block, (dx, dy), distance, block_index):
                         break
                     
+                    new_block = block.move((dx, dy), distance)
                     new_blocks = self.blocks[:]
                     new_blocks[block_index] = new_block
                     new_state = GameState(self.board, new_blocks, self, (block.id, dx, dy), self.depth + 1)
@@ -130,7 +157,7 @@ class GameState:
 
         return possible_moves
     
-    def _is_path_clear(self, block: Block, direction: Tuple[int, int], distance: int) -> bool:
+    def _is_path_clear_for_distance(self, block: Block, direction: Tuple[int, int], distance: int, moving_block_index: int) -> bool:
         dx, dy = direction
         occupied = self.get_occupied_coords()
         moving_block_coords = set(block.get_absolute_coords())
@@ -141,29 +168,32 @@ class GameState:
                 x = block.x + dx * step + shape_dx
                 y = block.y + dy * step + shape_dy
                 
-                if not (0 <= x < self.board.width and 0 <= y < self.board.height):
-                    exit_color = self.board.get_exit_color(x, y)
-                    if exit_color is None or exit_color.lower() != block.color.lower():
+                if 0 <= x < self.board.width and 0 <= y < self.board.height:
+                    if (x, y) in occupied or (x, y) in self.board.barriers:
                         return False
-                
-                if (x, y) in occupied:
+                    
+                    if (x, y) in self.board.exits:
+                        return False
+                else:
                     return False
         
         return True
-    
-    def _is_exit_move_valid(self, new_coords: Set[Tuple[int, int]], block: Block) -> bool:
-        for x, y in new_coords:
-            exit_color = self.board.get_exit_color(x, y)
-            if exit_color is not None and exit_color.lower() == block.color.lower():
-                return True
-        return False
     
     def _is_collision(self, new_coords: Set[Tuple[int, int]], block_index: int) -> bool:
         occupied = self.get_occupied_coords()
         moving_block_coords = set(self.blocks[block_index].get_absolute_coords())
         occupied -= moving_block_coords
         
-        return not new_coords.isdisjoint(occupied)
+        if new_coords.intersection(occupied):
+            return True 
+        
+        for x, y in new_coords:
+            if not (0 <= x < self.board.width and 0 <= y < self.board.height):
+                return True
+            elif self.board.is_exit_at(x, y):
+                return True
+        
+        return False
     
     def __eq__(self, other):
         if not isinstance(other, GameState):
@@ -227,21 +257,12 @@ class GameState:
             return None
         
         distance = 1
-        new_block = block.move((dx, dy), distance)
-        new_coords = set(new_block.get_absolute_coords())
         
-        if not self._is_path_clear(block, (dx, dy), distance):
-            return None
-        
-        if self._is_exit_move_valid(new_coords, block):
+        if self.board.would_be_adjacent_to_exit_after_move(block, (dx, dy), distance):
             return (block.id, (dx, dy), distance)
         
-        if self._is_collision(new_coords, self.selected_block_index):
+        if not self._is_path_clear_for_distance(block, (dx, dy), distance, self.selected_block_index):
             return None
-        
-        for x, y in new_coords:
-            if not (0 <= x < self.board.width and 0 <= y < self.board.height):
-                return None
         
         return (block.id, (dx, dy), distance)
     
@@ -278,7 +299,8 @@ class GameState:
                 directions.extend([(0, -1), (0, 1)])
 
             for dx, dy in directions:
-                if self._is_path_clear(block, (dx, dy), 1):
+                if self.board.would_be_adjacent_to_exit_after_move(block, (dx, dy), 1) or \
+                   self._is_path_clear_for_distance(block, (dx, dy), 1, i):
                     is_trapped = False
                     break
             
