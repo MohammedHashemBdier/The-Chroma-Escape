@@ -8,13 +8,14 @@ class MovementType(Enum):
     ANY = 3
 
 class Block:
-    def __init__(self, color: str, x: int, y: int, shape: List[Tuple[int, int]], movement_type: MovementType, id: int = None):
+    def __init__(self, color: str, x: int, y: int, shape: List[Tuple[int, int]], movement_type: MovementType, id: int = None, move_lock: int = -1):
         self.color = color
         self.x = x
         self.y = y
         self.shape = shape
         self.movement_type = movement_type
         self.id = id
+        self.move_lock = move_lock
 
     def get_absolute_coords(self) -> List[Tuple[int, int]]:
         absolute_coords = []
@@ -41,7 +42,7 @@ class Block:
         return new_block
 
     def __repr__(self):
-        return f"Block(Color: {self.color}, Pos: ({self.x}, {self.y}), Type: {self.movement_type.name})"
+        return f"Block(Color: {self.color}, Pos: ({self.x}, {self.y}), Lock: {self.move_lock}, Type: {self.movement_type.name})"
     
 class Board:
     def __init__(self, width: int, height: int, exits: dict, barriers: set):
@@ -78,11 +79,19 @@ class GameState:
             occupied.update(block.get_absolute_coords())
         return occupied
     
+    def update_move_locks_for_color(self, color: str):
+        for block in self.blocks:
+            if block.color == color and block.move_lock > 0:
+                block.move_lock -= 1
+
     def get_possible_moves(self) -> List[Tuple['GameState', Tuple[int, int, int, int]]]:
         possible_moves = []
         max_dist = max(self.board.width, self.board.height)
         
         for block_index, block in enumerate(self.blocks):
+            if block.move_lock == 0:
+                continue
+
             directions = []
             if block.movement_type in [MovementType.HORIZONTAL, MovementType.ANY]:
                 directions.extend([(1, 0), (-1, 0)])
@@ -159,7 +168,7 @@ class GameState:
         return hash(self.get_hashable_key())
 
     def get_hashable_key(self) -> tuple:
-        positions_list = [(block.y, block.x, block.color) for block in self.blocks]
+        positions_list = [(block.y, block.x, block.color, block.move_lock) for block in self.blocks]
         return tuple(sorted(positions_list))
     
     def get_solution_path(self) -> List['GameState']:
@@ -249,9 +258,10 @@ class GameState:
         return None
 
     def get_trapped_block_indices(self) -> List[int]:
+        """إرجاع فهرس القطع التي لا يمكنها التحرك بسبب عوائق مادية فقط."""
         trapped_indices = []
         for i, block in enumerate(self.blocks):
-            is_trapped = True
+            is_trapped_by_obstacles = True
             directions = []
             if block.movement_type in [MovementType.HORIZONTAL, MovementType.ANY]:
                 directions.extend([(-1, 0), (1, 0)])
@@ -260,9 +270,9 @@ class GameState:
 
             for dx, dy in directions:
                 if self._is_path_clear(block, (dx, dy), 1):
-                    is_trapped = False
+                    is_trapped_by_obstacles = False
                     break
             
-            if is_trapped:
+            if is_trapped_by_obstacles:
                 trapped_indices.append(i)
         return trapped_indices

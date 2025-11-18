@@ -2,10 +2,16 @@ import pygame
 from model import GameState, MovementType, Block, Board
 import json
 import copy
+import traceback
 
 MOVE_SUCCESS = "success"
 MOVE_INVALID = "invalid"
 MOVE_EXIT = "exit"
+
+COLOR_ID_MAP = {
+    1: "red", 2: "blue", 3: "green", 4: "yellow",
+    5: "cyan", 6: "purple", 7: "orange"
+}
 
 class GameLogic:
     def __init__(self):
@@ -25,6 +31,9 @@ class GameLogic:
             return (current_state, MOVE_INVALID)
 
         block = current_state.blocks[block_index]
+        if block.move_lock == 0:
+            return (current_state, MOVE_INVALID)
+
         dx, dy = direction_vector
         board = current_state.board
 
@@ -40,12 +49,13 @@ class GameLogic:
         
         moved_block = Block(
             color=block.color, x=final_x, y=final_y, 
-            shape=block.shape, movement_type=block.movement_type, id=block.id
+            shape=block.shape, movement_type=block.movement_type, id=block.id, move_lock=block.move_lock
         )
         final_coords = set(moved_block.get_absolute_coords())
 
         if self._is_exit_move_valid(final_coords, block, board):
             new_state = self._create_new_state_after_exit(current_state, block_index)
+            new_state.update_move_locks_for_color(block.color)
             self.move_history.append((current_state, (block_id, dx, dy, distance)))
             return (new_state, MOVE_EXIT)
 
@@ -99,7 +109,7 @@ class GameLogic:
             check_x = block.x + dx * step
             check_y = block.y + dy * step
             
-            temp_block = Block(block.color, check_x, check_y, moving_block_shape, block.movement_type, block.id)
+            temp_block = Block(block.color, check_x, check_y, moving_block_shape, block.movement_type, block.id, block.move_lock)
             temp_coords = set(temp_block.get_absolute_coords())
 
             if temp_coords.intersection(obstacle_coords):
@@ -146,6 +156,9 @@ class GameLogic:
         max_dist = max(board.width, board.height) 
 
         for block_index, block in enumerate(current_state.blocks):
+            if block.move_lock == 0:
+                continue
+
             directions = []
             if block.movement_type in [MovementType.HORIZONTAL, MovementType.ANY]:
                 directions.extend([(1, 0), (-1, 0)])
@@ -162,12 +175,13 @@ class GameLogic:
                     
                     moved_block = Block(
                         color=block.color, x=final_x, y=final_y, 
-                        shape=block.shape, movement_type=block.movement_type, id=block.id
+                        shape=block.shape, movement_type=block.movement_type, id=block.id, move_lock=block.move_lock
                     )
                     final_coords = set(moved_block.get_absolute_coords())
                     
                     if self._is_exit_move_valid(final_coords, block, board):
                         new_state = self._create_new_state_after_exit(current_state, block_index)
+                        new_state.update_move_locks_for_color(block.color)
                         possible_next_states.append((new_state, (block.id, dx, dy, distance)))
                         break
                     
@@ -214,26 +228,33 @@ def load_game_state(file_path: str) -> GameState:
     except FileNotFoundError:
         print(f"Error: File not found at {file_path}")
         return None
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
         print(f"Error: Invalid JSON format in {file_path}")
+        print(f"Details: {e}")
+        return None
+    except Exception as e:
+        print(f"An unexpected error occurred while reading {file_path}")
+        traceback.print_exc()
         return None
         
     exits_dict = {}
-    for exit_data in data.get('exits', []):
-        pos = (exit_data['x'], exit_data['y'])
-        exits_dict[pos] = {
-            "color": exit_data['color'],
-            "direction": exit_data.get('direction')
-        }
+    for exit_data in data.get('exists', []):
+        color_id = exit_data['color']
+        color_name = COLOR_ID_MAP.get(color_id, "grey")
+        for coord in exit_data['coordinates']:
+            # تبديل الإحداثيات من (y, x) إلى (x, y)
+            pos = (coord[1], coord[0])
+            if pos not in exits_dict:
+                exits_dict[pos] = {"color": color_name}
 
-    barriers_set = {
-        (barrier_data['x'], barrier_data['y'])
-        for barrier_data in data.get('barriers', [])
-    }
+    barriers_set = set()
+    for barrier in data.get('blocks', []):
+        # تبديل الإحداثيات من (y, x) إلى (x, y)
+        barriers_set.add((barrier[1], barrier[0]))
     
     board = Board(
-        width=data['board_width'],
-        height=data['board_height'],
+        width=data['cols'],
+        height=data['rows'],
         exits=exits_dict,
         barriers=barriers_set
     )
@@ -246,18 +267,32 @@ def load_game_state(file_path: str) -> GameState:
         "ANY": MovementType.ANY
     }
     
-    for i, block_data in enumerate(data['blocks']):
-        move_type = movement_map.get(block_data.get('movement_type').upper())
-        if not move_type:
-            raise ValueError(f"Invalid movement type: {block_data.get('movement_type')}")
+    for i, shape_data in enumerate(data['shapes']):
+        color_id = shape_data['colors']
+        color_name = COLOR_ID_MAP.get(color_id, "grey")
+        
+        coords = shape_data['coordinates']
+        if not coords:
+            print(f"Warning: Shape {i} has no coordinates. Skipping.")
+            continue
+        
+        # تبديل الإحداثيات من (y, x) إلى (x, y) وحساب الشكل النسبي
+        base_y, base_x = coords[0]
+        shape = [(coord[1] - base_x, coord[0] - base_y) for coord in coords]
+        
+        move_type_str = shape_data.get('direction', 'any').upper()
+        move_type = movement_map.get(move_type_str, MovementType.ANY)
+            
+        move_lock = shape_data.get('move_lock', -1)
             
         block = Block(
-            color=block_data['color'].lower(),
-            x=block_data['x'],
-            y=block_data['y'],
-            shape=[tuple(s) for s in block_data['shape']], 
+            color=color_name,
+            x=base_x,
+            y=base_y,
+            shape=shape, 
             movement_type=move_type,
-            id=i
+            id=i,
+            move_lock=move_lock
         )
         blocks_list.append(block)
 
