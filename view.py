@@ -161,7 +161,7 @@ class GameVisualizer:
             y_pos = y * self.CELL_SIZE
             pygame.draw.line(self.screen, GRID_LINE_COLOR, (0, y_pos), (self.screen_width, y_pos), 1)
 
-        border_thickness = 2
+        border_thickness = self.CELL_SIZE / 2 # Same thickness as cells
         default_border_color = (50, 50, 50)
         
         exit_positions = set(exits.keys())
