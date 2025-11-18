@@ -125,7 +125,7 @@ class GameVisualizer:
                                         (center_x - 8, center_y + 5), 
                                         (center_x + 8, center_y + 5)])
 
-    def _draw_cell(self, x: int, y: int, color: tuple, is_selected: bool = False, is_locked: bool = False, is_trapped: bool = False):
+    def _draw_cell(self, x: int, y: int, color: tuple, is_selected: bool = False, is_locked: bool = False, is_trapped: bool = False, display_lock: int = -1):
         left = int(x * self.CELL_SIZE)
         top = int(y * self.CELL_SIZE)
         
@@ -147,6 +147,12 @@ class GameVisualizer:
         border_thickness = 3 if is_selected else 1
         border_color = (0, 0, 0) if is_selected else GRID_LINE_COLOR
         pygame.draw.rect(self.screen, border_color, (left, top, self.CELL_SIZE, self.CELL_SIZE), border_thickness)
+
+        # رسم رقم القفل فوق القطعة
+        if display_lock > 0:
+            lock_text = self.small_font.render(str(display_lock), True, (255, 255, 255))
+            text_rect = lock_text.get_rect(center=(left + self.CELL_SIZE // 2, top + self.CELL_SIZE // 2))
+            self.screen.blit(lock_text, text_rect)
     
     def _draw_grid(self, exits: dict):
         for x in range(self.width + 1):
@@ -212,11 +218,18 @@ class GameVisualizer:
         blocks_text = self.small_font.render(f"Blocks: {len(state.blocks)}", True, (0, 0, 0))
         self.screen.blit(blocks_text, (10, 40))
 
+        # عرض قاموس الأقفال
+        y_offset = 70
+        for color, lock_value in state.display_lock.items():
+            lock_text = self.small_font.render(f"{color.capitalize()}: {lock_value}", True, (0, 0, 0))
+            self.screen.blit(lock_text, (10, y_offset))
+            y_offset += 25
+
         if state.selected_block_index is not None and state.selected_block_index < len(state.blocks):
             selected_block = state.blocks[state.selected_block_index]
             lock_text = f"Selected: {selected_block.color.capitalize()} (Lock: {selected_block.move_lock})"
             lock_surface = self.small_font.render(lock_text, True, (0, 0, 0))
-            self.screen.blit(lock_surface, (10, 70))
+            self.screen.blit(lock_surface, (10, y_offset))
         
         if message:
             msg_text = self.small_font.render(message, True, (255, 0, 0))
@@ -294,22 +307,24 @@ class GameVisualizer:
             
         for i, block in enumerate(state.blocks):
             base_color = COLOR_MAP.get(block.color.lower(), (0, 0, 0))
-            
             is_trapped_by_obstacles = (trapped_block_indices and i in trapped_block_indices)
             is_locked = (block.move_lock == 0)
             
             color = base_color
             if is_trapped_by_obstacles:
-                color = tuple(c // 4 for c in base_color) # باهت جداً جداً
+                color = tuple(c // 4 for c in base_color)
             elif is_locked:
                 r, g, b = base_color
                 grey = (r + g + b) / 3
-                color = (int((r + grey) / 2.5), int((g + grey) / 2.5), int((b + grey) / 2.5)) # رمادي باهت
+                color = (int((r + grey) / 2.5), int((g + grey) / 2.5), int((b + grey) / 2.5))
             
             is_selected = (i == state.selected_block_index) or (set(block.get_absolute_coords()) == selected_block_coords)
             
+            # الحصول على قيمة العرض للقفل من قاموس الحالة
+            display_lock_value = state.display_lock.get(block.color, -1)
+            
             for x, y in block.get_absolute_coords():
-                self._draw_cell(x, y, color, is_selected=is_selected, is_locked=is_locked, is_trapped=is_trapped_by_obstacles)
+                self._draw_cell(x, y, color, is_selected=is_selected, is_locked=is_locked, is_trapped=is_trapped_by_obstacles, display_lock=display_lock_value)
 
             self._draw_movement_arrow(block, is_selected=is_selected)
         

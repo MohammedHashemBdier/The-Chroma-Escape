@@ -139,6 +139,7 @@ class GameLogic:
         new_state = GameState(board=current_state.board, blocks=new_blocks, parent=current_state)
         new_state.selected_block_index = current_state.selected_block_index
         new_state.move_count = current_state.move_count + 1
+        new_state._inherit_display_locks(current_state)
         return new_state
     
     def _create_new_state_after_exit(self, current_state: GameState, block_index: int) -> GameState:
@@ -148,6 +149,7 @@ class GameLogic:
         new_state = GameState(board=current_state.board, blocks=new_blocks, parent=current_state)
         new_state.selected_block_index = None
         new_state.move_count = current_state.move_count + 1
+        new_state._update_display_locks_after_exit(current_state.blocks[block_index].color)
         return new_state
     
     def get_possible_moves(self, current_state: GameState) -> list:
@@ -181,7 +183,6 @@ class GameLogic:
                     
                     if self._is_exit_move_valid(final_coords, block, board):
                         new_state = self._create_new_state_after_exit(current_state, block_index)
-                        new_state.update_move_locks_for_color(block.color)
                         possible_next_states.append((new_state, (block.id, dx, dy, distance)))
                         break
                     
@@ -242,14 +243,12 @@ def load_game_state(file_path: str) -> GameState:
         color_id = exit_data['color']
         color_name = COLOR_ID_MAP.get(color_id, "grey")
         for coord in exit_data['coordinates']:
-            # تبديل الإحداثيات من (y, x) إلى (x, y)
             pos = (coord[1], coord[0])
             if pos not in exits_dict:
                 exits_dict[pos] = {"color": color_name}
 
     barriers_set = set()
     for barrier in data.get('blocks', []):
-        # تبديل الإحداثيات من (y, x) إلى (x, y)
         barriers_set.add((barrier[1], barrier[0]))
     
     board = Board(
@@ -275,8 +274,6 @@ def load_game_state(file_path: str) -> GameState:
         if not coords:
             print(f"Warning: Shape {i} has no coordinates. Skipping.")
             continue
-        
-        # تبديل الإحداثيات من (y, x) إلى (x, y) وحساب الشكل النسبي
         base_y, base_x = coords[0]
         shape = [(coord[1] - base_x, coord[0] - base_y) for coord in coords]
         
@@ -297,5 +294,6 @@ def load_game_state(file_path: str) -> GameState:
         blocks_list.append(block)
 
     start_state = GameState(board=board, blocks=blocks_list)
+    start_state._initialize_display_locks()
     
     return start_state

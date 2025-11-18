@@ -69,6 +69,8 @@ class GameState:
         self.depth = depth
         self.selected_block_index = None
         self.move_count = 0
+        # قاموس لتتبع أقرب قفل لكل لون
+        self.display_lock = {}
 
     def check_win_condition(self) -> bool:
         return len(self.blocks) == 0
@@ -110,6 +112,7 @@ class GameState:
                         new_blocks = self.blocks[:block_index] + self.blocks[block_index+1:]
                         new_state = GameState(self.board, new_blocks, self, (block.id, dx, dy), self.depth + 1)
                         new_state.move_count = self.move_count + 1
+                        new_state._update_display_locks_after_exit(block.color)
                         possible_moves.append((new_state, (block.id, dx, dy, distance)))
                         break
                     
@@ -120,8 +123,9 @@ class GameState:
                     new_blocks[block_index] = new_block
                     new_state = GameState(self.board, new_blocks, self, (block.id, dx, dy), self.depth + 1)
                     new_state.move_count = self.move_count + 1
+                    new_state._inherit_display_locks(self)
                     possible_moves.append((new_state, (block.id, dx, dy, distance)))
-        
+
         return possible_moves
     
     def _is_path_clear(self, block: Block, direction: Tuple[int, int], distance: int) -> bool:
@@ -258,10 +262,9 @@ class GameState:
         return None
 
     def get_trapped_block_indices(self) -> List[int]:
-        """إرجاع فهرس القطع التي لا يمكنها التحرك بسبب عوائق مادية فقط."""
         trapped_indices = []
         for i, block in enumerate(self.blocks):
-            is_trapped_by_obstacles = True
+            is_trapped = True
             directions = []
             if block.movement_type in [MovementType.HORIZONTAL, MovementType.ANY]:
                 directions.extend([(-1, 0), (1, 0)])
@@ -270,9 +273,40 @@ class GameState:
 
             for dx, dy in directions:
                 if self._is_path_clear(block, (dx, dy), 1):
-                    is_trapped_by_obstacles = False
+                    is_trapped = False
                     break
             
-            if is_trapped_by_obstacles:
+            if is_trapped:
                 trapped_indices.append(i)
         return trapped_indices
+
+    def _inherit_display_locks(self, parent_state: 'GameState'):
+        """وراثة قاموس العرض من الحالة الأب."""
+        self.display_lock = parent_state.display_lock.copy()
+
+    def _update_display_locks_after_exit(self, color: str):
+        """تحديث قاموس العرض بعد خروج قطعة."""
+        if color in self.display_lock:
+            self.display_lock[color] -= 1
+            if self.display_lock[color] <= 0:
+                del self.display_lock[color]
+        else:
+            # إذا لم يكن اللون موجوداً، فهذا يعني أن هذه أول قطعة من هذا اللون تخرج
+            # يجب أن نحسب أقل قفل بين جميع القطع المتبقية من نفس اللون
+            min_lock = float('inf')
+            for block in self.blocks:
+                if block.color == color:
+                    if block.move_lock > 0:
+                        min_lock = min(min_lock, block.move_lock)
+            
+            if min_lock != float('inf'):
+                self.display_lock[color] = min_lock
+
+    def _initialize_display_locks(self):
+        """تهيئة قاموس العرض عند إنشاء الحالة لأول مرة."""
+        self.display_lock = {}
+        for block in self.blocks:
+            if block.color not in self.display_lock:
+                self.display_lock[block.color] = block.move_lock
+            else:
+                self.display_lock[block.color] = min(self.display_lock[block.color], block.move_lock)
