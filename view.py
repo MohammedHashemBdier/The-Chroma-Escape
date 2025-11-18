@@ -216,7 +216,7 @@ class GameVisualizer:
                 "Press U to undo last move",
                 "Press R to restart level",
                 "Press M to switch to mouse control",
-                "Press A to auto-solve",
+                "Press S to solve with AI",
                 "Press ESC to quit"
             ]
         else:
@@ -225,7 +225,7 @@ class GameVisualizer:
                 "Press K to switch to keyboard control",
                 "Press U to undo last move",
                 "Press R to restart level",
-                "Press A to auto-solve",
+                "Press S to solve with AI",
                 "Press ESC to quit"
             ]
         

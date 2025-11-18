@@ -78,7 +78,7 @@ class GameState:
             occupied.update(block.get_absolute_coords())
         return occupied
     
-    def get_possible_moves(self) -> List[Tuple['GameState', Tuple[int, int, int]]]:
+    def get_possible_moves(self) -> List[Tuple['GameState', Tuple[int, int, int, int]]]:
         possible_moves = []
         max_dist = max(self.board.width, self.board.height)
         
@@ -99,9 +99,9 @@ class GameState:
                     
                     if self._is_exit_move_valid(new_coords, block):
                         new_blocks = self.blocks[:block_index] + self.blocks[block_index+1:]
-                        new_state = GameState(self.board, new_blocks, self, (block_index, dx, dy), self.depth + 1)
+                        new_state = GameState(self.board, new_blocks, self, (block.id, dx, dy), self.depth + 1)
                         new_state.move_count = self.move_count + 1
-                        possible_moves.append((new_state, (block_index, dx, dy, distance)))
+                        possible_moves.append((new_state, (block.id, dx, dy, distance)))
                         break
                     
                     if self._is_collision(new_coords, block_index):
@@ -109,9 +109,9 @@ class GameState:
                     
                     new_blocks = self.blocks[:]
                     new_blocks[block_index] = new_block
-                    new_state = GameState(self.board, new_blocks, self, (block_index, dx, dy), self.depth + 1)
+                    new_state = GameState(self.board, new_blocks, self, (block.id, dx, dy), self.depth + 1)
                     new_state.move_count = self.move_count + 1
-                    possible_moves.append((new_state, (block_index, dx, dy, distance)))
+                    possible_moves.append((new_state, (block.id, dx, dy, distance)))
         
         return possible_moves
     
@@ -219,7 +219,7 @@ class GameState:
             return None
         
         if self._is_exit_move_valid(new_coords, block):
-            return (self.selected_block_index, (dx, dy), distance)
+            return (block.id, (dx, dy), distance)
         
         if self._is_collision(new_coords, self.selected_block_index):
             return None
@@ -228,7 +228,7 @@ class GameState:
             if not (0 <= x < self.board.width and 0 <= y < self.board.height):
                 return None
         
-        return (self.selected_block_index, (dx, dy), distance)
+        return (block.id, (dx, dy), distance)
     
     def select_next_block(self, forward: bool = True):
         if not self.blocks:
@@ -254,9 +254,9 @@ class GameState:
             is_trapped = True
             directions = []
             if block.movement_type in [MovementType.HORIZONTAL, MovementType.ANY]:
-                directions.extend([(1, 0), (-1, 0)])
+                directions.extend([(-1, 0), (1, 0)])
             if block.movement_type in [MovementType.VERTICAL, MovementType.ANY]:
-                directions.extend([(0, 1), (0, -1)])
+                directions.extend([(0, -1), (0, 1)])
 
             for dx, dy in directions:
                 if self._is_path_clear(block, (dx, dy), 1):
