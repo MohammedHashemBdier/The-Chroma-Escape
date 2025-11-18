@@ -8,7 +8,7 @@ class MovementType(Enum):
     ANY = 3
 
 class Block:
-    def __init__(self, color: str, x: int, y: int, shape: List[Tuple[int, int]], movement_type: MovementType, id: int = None, move_lock: int = -1):
+    def __init__(self, color: str, x: int, y: int, shape: List[Tuple[int, int]], movement_type: MovementType, id: int = None, move_lock: int = 0):
         self.color = color
         self.x = x
         self.y = y
@@ -69,7 +69,6 @@ class GameState:
         self.depth = depth
         self.selected_block_index = None
         self.move_count = 0
-        # قاموس لتتبع أقرب قفل لكل لون
         self.display_lock = {}
 
     def check_win_condition(self) -> bool:
@@ -81,17 +80,18 @@ class GameState:
             occupied.update(block.get_absolute_coords())
         return occupied
     
-    def update_move_locks_for_color(self, color: str):
+    def decrease_all_move_locks(self):
         for block in self.blocks:
-            if block.color == color and block.move_lock > 0:
+            if block.move_lock > 0:
                 block.move_lock -= 1
+        self._initialize_display_locks()
 
     def get_possible_moves(self) -> List[Tuple['GameState', Tuple[int, int, int, int]]]:
         possible_moves = []
         max_dist = max(self.board.width, self.board.height)
         
         for block_index, block in enumerate(self.blocks):
-            if block.move_lock == 0:
+            if block.move_lock > 0:
                 continue
 
             directions = []
@@ -109,10 +109,12 @@ class GameState:
                     new_coords = set(new_block.get_absolute_coords())
                     
                     if self._is_exit_move_valid(new_coords, block):
-                        new_blocks = self.blocks[:block_index] + self.blocks[block_index+1:]
+                        new_blocks = copy.deepcopy(self.blocks)
+                        new_blocks.pop(block_index)
                         new_state = GameState(self.board, new_blocks, self, (block.id, dx, dy), self.depth + 1)
                         new_state.move_count = self.move_count + 1
-                        new_state._update_display_locks_after_exit(block.color)
+                        new_state._inherit_display_locks(self)
+                        new_state.decrease_all_move_locks()
                         possible_moves.append((new_state, (block.id, dx, dy, distance)))
                         break
                     
@@ -264,6 +266,10 @@ class GameState:
     def get_trapped_block_indices(self) -> List[int]:
         trapped_indices = []
         for i, block in enumerate(self.blocks):
+            if block.move_lock > 0:
+                trapped_indices.append(i)
+                continue
+                
             is_trapped = True
             directions = []
             if block.movement_type in [MovementType.HORIZONTAL, MovementType.ANY]:
@@ -281,32 +287,13 @@ class GameState:
         return trapped_indices
 
     def _inherit_display_locks(self, parent_state: 'GameState'):
-        """وراثة قاموس العرض من الحالة الأب."""
         self.display_lock = parent_state.display_lock.copy()
 
-    def _update_display_locks_after_exit(self, color: str):
-        """تحديث قاموس العرض بعد خروج قطعة."""
-        if color in self.display_lock:
-            self.display_lock[color] -= 1
-            if self.display_lock[color] <= 0:
-                del self.display_lock[color]
-        else:
-            # إذا لم يكن اللون موجوداً، فهذا يعني أن هذه أول قطعة من هذا اللون تخرج
-            # يجب أن نحسب أقل قفل بين جميع القطع المتبقية من نفس اللون
-            min_lock = float('inf')
-            for block in self.blocks:
-                if block.color == color:
-                    if block.move_lock > 0:
-                        min_lock = min(min_lock, block.move_lock)
-            
-            if min_lock != float('inf'):
-                self.display_lock[color] = min_lock
-
     def _initialize_display_locks(self):
-        """تهيئة قاموس العرض عند إنشاء الحالة لأول مرة."""
         self.display_lock = {}
         for block in self.blocks:
-            if block.color not in self.display_lock:
-                self.display_lock[block.color] = block.move_lock
-            else:
-                self.display_lock[block.color] = min(self.display_lock[block.color], block.move_lock)
+            if block.move_lock > 0:
+                if block.color not in self.display_lock:
+                    self.display_lock[block.color] = block.move_lock
+                else:
+                    self.display_lock[block.color] = min(self.display_lock[block.color], block.move_lock)

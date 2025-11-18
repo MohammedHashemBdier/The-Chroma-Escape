@@ -31,7 +31,7 @@ class GameLogic:
             return (current_state, MOVE_INVALID)
 
         block = current_state.blocks[block_index]
-        if block.move_lock == 0:
+        if block.move_lock > 0:
             return (current_state, MOVE_INVALID)
 
         dx, dy = direction_vector
@@ -55,7 +55,6 @@ class GameLogic:
 
         if self._is_exit_move_valid(final_coords, block, board):
             new_state = self._create_new_state_after_exit(current_state, block_index)
-            new_state.update_move_locks_for_color(block.color)
             self.move_history.append((current_state, (block_id, dx, dy, distance)))
             return (new_state, MOVE_EXIT)
 
@@ -143,13 +142,14 @@ class GameLogic:
         return new_state
     
     def _create_new_state_after_exit(self, current_state: GameState, block_index: int) -> GameState:
-        new_blocks = current_state.blocks[:]
+        new_blocks = copy.deepcopy(current_state.blocks)
         new_blocks.pop(block_index)
         
         new_state = GameState(board=current_state.board, blocks=new_blocks, parent=current_state)
         new_state.selected_block_index = None
         new_state.move_count = current_state.move_count + 1
-        new_state._update_display_locks_after_exit(current_state.blocks[block_index].color)
+        new_state._inherit_display_locks(current_state)
+        new_state.decrease_all_move_locks()
         return new_state
     
     def get_possible_moves(self, current_state: GameState) -> list:
@@ -158,7 +158,7 @@ class GameLogic:
         max_dist = max(board.width, board.height) 
 
         for block_index, block in enumerate(current_state.blocks):
-            if block.move_lock == 0:
+            if block.move_lock > 0:
                 continue
 
             directions = []
@@ -280,7 +280,7 @@ def load_game_state(file_path: str) -> GameState:
         move_type_str = shape_data.get('direction', 'any').upper()
         move_type = movement_map.get(move_type_str, MovementType.ANY)
             
-        move_lock = shape_data.get('move_lock', -1)
+        move_lock = shape_data.get('move_lock', 0)
             
         block = Block(
             color=color_name,
