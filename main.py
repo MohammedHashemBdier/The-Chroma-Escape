@@ -135,6 +135,8 @@ def run_game(level_index=0):
                     elif event.key == pygame.K_k:
                         control_mode = "keyboard"
                         message = "Switched to keyboard control"
+                    elif event.key == pygame.K_p:
+                        logic.print_possible_moves(current_state)
                     
                     elif event.key == pygame.K_s:
                         message = "AI is solving..."
@@ -167,10 +169,6 @@ def run_game(level_index=0):
                             message = "No solution found!"
                         
                         pygame.time.set_timer(pygame.USEREVENT + 1, 3000)
-
-                    elif event.type == pygame.USEREVENT + 1:
-                        message = ""
-                        pygame.time.set_timer(pygame.USEREVENT + 1, 0)
 
                     elif control_mode == "keyboard" and not is_ai_playing:
                         if event.key == pygame.K_TAB:

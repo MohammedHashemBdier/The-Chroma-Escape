@@ -131,10 +131,11 @@ class GameVisualizer:
         
         final_color = color
         if is_trapped:
-            final_color = tuple(c // 4 for c in color)
+            final_color = tuple(int(c * 0.6) for c in color)
         elif is_locked:
             r, g, b = color
-            final_color = (int(r * 0.7), int(g * 0.7), int(b * 0.7))  # أفتح بنسبة 70%
+            final_color = (int(r * 0.7), int(g * 0.7), int(b * 0.7))
+
         if is_selected:
             glow_color = tuple(min(255, c + 50) for c in final_color)
             pygame.draw.rect(self.screen, glow_color, (left-2, top-2, self.CELL_SIZE+4, self.CELL_SIZE+4))
@@ -160,7 +161,7 @@ class GameVisualizer:
             y_pos = y * self.CELL_SIZE
             pygame.draw.line(self.screen, GRID_LINE_COLOR, (0, y_pos), (self.screen_width, y_pos), 1)
 
-        border_thickness = self.CELL_SIZE / 2 # Same thickness as cells
+        border_thickness = 2
         default_border_color = (50, 50, 50)
         
         exit_positions = set(exits.keys())
@@ -196,37 +197,37 @@ class GameVisualizer:
         for (x, y), exit_info in exits.items():
             color = COLOR_MAP.get(exit_info["color"].lower(), (200, 200, 200))
             
-            if x == 0:  
+            if x == 0:
                 center_x = border_thickness // 2
                 center_y = y * self.CELL_SIZE + self.CELL_SIZE // 2
                 pygame.draw.polygon(self.screen, (255, 255, 255), [
-                    (center_x - border_thickness // 3, center_y),
-                    (center_x + border_thickness // 3, center_y - border_thickness // 4),
-                    (center_x + border_thickness // 3, center_y + border_thickness // 4)
+                    (center_x - 4, center_y),
+                    (center_x + 2, center_y - 3),
+                    (center_x + 2, center_y + 3)
                 ])
-            elif x == self.width - 1:  
+            elif x == self.width - 1:
                 center_x = self.screen_width - border_thickness // 2
                 center_y = y * self.CELL_SIZE + self.CELL_SIZE // 2
                 pygame.draw.polygon(self.screen, (255, 255, 255), [
-                    (center_x + border_thickness // 3, center_y),
-                    (center_x - border_thickness // 3, center_y - border_thickness // 4),
-                    (center_x - border_thickness // 3, center_y + border_thickness // 4)
+                    (center_x + 4, center_y),
+                    (center_x - 2, center_y - 3),
+                    (center_x - 2, center_y + 3)
                 ])
-            elif y == 0: 
+            elif y == 0:
                 center_x = x * self.CELL_SIZE + self.CELL_SIZE // 2
                 center_y = border_thickness // 2
                 pygame.draw.polygon(self.screen, (255, 255, 255), [
-                    (center_x, center_y - border_thickness // 3),
-                    (center_x - border_thickness // 4, center_y + border_thickness // 3),
-                    (center_x + border_thickness // 4, center_y + border_thickness // 3)
+                    (center_x, center_y - 4),
+                    (center_x - 3, center_y + 2),
+                    (center_x + 3, center_y + 2)
                 ])
-            elif y == self.height - 1: 
+            elif y == self.height - 1:
                 center_x = x * self.CELL_SIZE + self.CELL_SIZE // 2
                 center_y = self.screen_height - border_thickness // 2
                 pygame.draw.polygon(self.screen, (255, 255, 255), [
-                    (center_x, center_y + border_thickness // 3),
-                    (center_x - border_thickness // 4, center_y - border_thickness // 3),
-                    (center_x + border_thickness // 4, center_y - border_thickness // 3)
+                    (center_x, center_y + 4),
+                    (center_x - 3, center_y - 2),
+                    (center_x + 3, center_y - 2)
                 ])
                 
     def draw_win_screen(self, move_count=0):
@@ -280,6 +281,7 @@ class GameVisualizer:
                 "Press U to undo last move",
                 "Press R to restart level",
                 "Press M to switch to mouse control",
+                "Press P to print possible moves",
                 "Press S to solve with AI",
                 "Press ESC to quit"
             ]
@@ -289,11 +291,12 @@ class GameVisualizer:
                 "Press K to switch to keyboard control",
                 "Press U to undo last move",
                 "Press R to restart level",
+                "Press P to print possible moves",
                 "Press S to solve with AI",
                 "Press ESC to quit"
             ]
         
-        y_pos = self.screen_height - 140
+        y_pos = self.screen_height - 160
         for instruction in instructions:
             inst_text = self.small_font.render(instruction, True, (0, 0, 0))
             self.screen.blit(inst_text, (10, y_pos))
@@ -349,11 +352,10 @@ class GameVisualizer:
             
             color = base_color
             if is_trapped_by_obstacles:
-                color = tuple(c // 0.6 for c in base_color)
+                color = tuple(int(c * 0.6) for c in base_color)
             elif is_locked:
                 r, g, b = base_color
-                grey = (r + g + b) / 3
-                color = (int((r + grey) / 2.5), int((g + grey) / 2.5), int((b + grey) / 2.5))
+                color = (int(r * 0.7), int(g * 0.7), int(b * 0.7))
             
             is_selected = (i == state.selected_block_index) or (set(block.get_absolute_coords()) == selected_block_coords)
             

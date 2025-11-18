@@ -17,6 +17,51 @@ class GameLogic:
     def __init__(self):
         self.move_history = []
 
+    def print_possible_moves(self, current_state: GameState):
+        print("\n" + "="*50)
+        print("POSSIBLE MOVES FOR ALL BLOCKS:")
+        print("="*50)
+
+        all_moves = current_state.get_possible_moves()
+        
+        if not all_moves:
+            print("No possible moves available.")
+            print("="*50)
+            return
+
+        moves_by_block = {}
+        for new_state, action in all_moves:
+            block_id, dx, dy, distance = action
+            if block_id not in moves_by_block:
+                moves_by_block[block_id] = []
+            moves_by_block[block_id].append((dx, dy, distance))
+
+        blocks_by_id = {block.id: block for block in current_state.blocks}
+
+        for block_id, moves in moves_by_block.items():
+            if block_id in blocks_by_id:
+                block = blocks_by_id[block_id]
+                print(f"\nBlock ID: {block_id} | Color: {block.color.capitalize()} | Position: ({block.x}, {block.y})")
+                print("-" * 30)
+                if not moves:
+                    print("  No valid moves for this block.")
+                else:
+                    for dx, dy, distance in moves:
+                        direction_str = ""
+                        if dx > 0:
+                            direction_str = "RIGHT"
+                        elif dx < 0:
+                            direction_str = "LEFT"
+                        elif dy > 0:
+                            direction_str = "DOWN"
+                        elif dy < 0:
+                            direction_str = "UP"
+                    
+                        exit_str = " (EXIT)" if current_state.board.would_be_adjacent_to_exit_after_move(block, (dx, dy), distance) else ""
+                    
+                        print(f"  - Move: {direction_str} | Distance: {distance}{exit_str}")
+        print("\n" + "="*50)
+
     def try_move_manual(self, current_state: GameState, block_id: int, direction_vector: tuple, distance: int) -> tuple:
         if distance <= 0:
             return (current_state, MOVE_INVALID)
