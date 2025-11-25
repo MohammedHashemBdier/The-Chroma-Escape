@@ -1,69 +1,122 @@
 {
-  "board_width": 7,
-  "board_height": 7,
-  "exits": [
-    { "x": 0, "y": 3, "color": "red" },
-    { "x": 6, "y": 3, "color": "blue" },
-    { "x": 3, "y": 0, "color": "yellow" },
-    { "x": 3, "y": 6, "color": "green" },
-    { "x": 0, "y": 1, "color": "purple" },
-    { "x": 6, "y": 5, "color": "orange" }
+  "rows": 8,
+  "cols": 7,
+  "shapes": [
+    {
+      "colors": 1,
+      "coordinates": [
+        [6, 1],
+        [6, 2]
+      ],
+      "move_lock": 3
+    },
+    {
+      "colors": 2,
+      "coordinates": [
+        [3, 4],
+        [4, 4]
+      ]
+    },
+    {
+      "colors": 2,
+      "coordinates": [
+        [4, 3],
+        [5, 3]
+      ]
+    },
+    {
+      "colors": 3,
+      "coordinates": [
+        [5, 5],
+        [6, 4],
+        [6, 5]
+      ]
+    },
+    {
+      "colors": 4,
+      "coordinates": [
+        [1, 1],
+        [1, 2],
+        [2, 1]
+      ]
+    },
+    {
+      "colors": 5,
+      "coordinates": [
+        [2, 3],
+        [3, 3]
+      ]
+    },
+    {
+      "colors": 5,
+      "coordinates": [
+        [3, 2],
+        [4, 2]
+      ]
+    },
+    {
+      "colors": 6,
+      "coordinates": [
+        [1, 4],
+        [1, 5]
+      ],
+      "move_lock": 4
+    }
   ],
-  "barriers": [{ "x": 3, "y": 3 }],
   "blocks": [
+    [0, 0],
+    [1, 0],
+    [2, 0],
+    [3, 0],
+    [4, 0],
+    [5, 0],
+    [6, 0],
+    [7, 0],
+    [0, 6],
+    [1, 6],
+    [2, 6],
+    [3, 6],
+    [4, 6],
+    [5, 6],
+    [6, 6],
+    [7, 6]
+  ],
+  "exists": [
     {
-      "color": "red",
-      "x": 4,
-      "y": 3,
-      "shape": [
-        [0, 0],
-        [1, 0]
-      ],
-      "movement_type": "HORIZONTAL"
+      "color": 1,
+      "coordinates": [
+        [0, 1],
+        [0, 2]
+      ]
     },
     {
-      "color": "blue",
-      "x": 1,
-      "y": 3,
-      "shape": [
-        [0, 0],
-        [1, 0]
-      ],
-      "movement_type": "HORIZONTAL"
+      "color": 2,
+      "coordinates": [[0, 3]]
     },
     {
-      "color": "yellow",
-      "x": 3,
-      "y": 4,
-      "shape": [
-        [0, 0],
-        [0, 1]
-      ],
-      "movement_type": "VERTICAL"
+      "color": 3,
+      "coordinates": [
+        [0, 4],
+        [0, 5]
+      ]
     },
     {
-      "color": "green",
-      "x": 3,
-      "y": 1,
-      "shape": [
-        [0, 0],
-        [0, 1]
-      ],
-      "movement_type": "VERTICAL"
+      "color": 4,
+      "coordinates": [
+        [7, 1],
+        [7, 2]
+      ]
     },
     {
-      "color": "purple",
-      "x": 1,
-      "y": 1,
-      "shape": [[0, 0]],
-      "movement_type": "ANY"
+      "color": 5,
+      "coordinates": [[7, 3]]
     },
     {
-      "color": "orange",
-      "x": 5,
-      "y": 5,
-      "shape": [[0, 0]],
-      "movement_type": "ANY"
+      "color": 6,
+      "coordinates": [
+        [7, 4],
+        [7, 5]
+      ]
     }
   ]
 }

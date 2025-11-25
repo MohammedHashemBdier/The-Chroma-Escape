@@ -10,6 +10,7 @@ from search_algorithms import AStarSolver
 
 LEVEL_FILES = [
     "levels/level_01.json",
+    "levels/level_02.json",
 ]
 
 def show_error_screen(screen, font, error_message):
