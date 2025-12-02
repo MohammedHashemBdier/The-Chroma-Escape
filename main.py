@@ -4,9 +4,13 @@ import sys
 import copy
 import traceback
 from controller import GameLogic, load_game_state, MOVE_SUCCESS, MOVE_INVALID, MOVE_EXIT
+from search_algorithms.bfs import BFSSolver
+from search_algorithms.dfs import DFSSolver
+from search_algorithms.ucs import UCSSolver
+from search_algorithms.greedy import GreedySolver
+from search_algorithms.astar import AStarSolver
 from view import GameVisualizer
 from sound_manager import SoundManager
-from search_algorithms import AStarSolver
 
 LEVEL_FILES = [
     "levels/level_01.json",
@@ -38,11 +42,62 @@ def show_error_screen(screen, font, error_message):
             if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                 waiting = False
 
-def run_game(level_index=0):
+def extract_moves_from_solution_path(solution_path, current_state):
+    """استخراج الحركات الصالحة من مسار الحل، بدءاً من الحالة الحالية."""
+    if len(solution_path) <= 1:
+        return []
+    
+    # البحث عن الحالة الحالية في مسار الحل
+    current_state_key = current_state.get_hashable_key()
+    start_index = 0
+    
+    for i, state in enumerate(solution_path):
+        if state.get_hashable_key() == current_state_key:
+            start_index = i
+            break
+    
+    # إذا لم نجد الحالة الحالية، نبدأ من البداية
+    # لكننا نطبع تحذير
+    if start_index == 0 and current_state_key != solution_path[0].get_hashable_key():
+        print(f"Warning: Current state not found in solution path!")
+        print(f"Current state: {len(current_state.blocks)} blocks, IDs: {[block.id for block in current_state.blocks]}")
+        print(f"First state in path: {len(solution_path[0].blocks)} blocks, IDs: {[block.id for block in solution_path[0].blocks]}")
+        return []
+    
+    # نبدأ من الحالة التالية للحالة الحالية
+    moves = []
+    for i in range(start_index + 1, len(solution_path)):
+        state = solution_path[i]
+        if state.action is not None:
+            moves.append(state.action)
+    
+    # التحقق من أن الحركات متسلسلة ومتتابعة
+    valid_moves = []
+    simulation_state = copy.deepcopy(current_state)
+    logic = GameLogic()  # ننشئ نسخة جديدة للمحاكاة
+    
+    for action in moves:
+        block_id, dx, dy, distance = action
+        
+        # نطبق الحركة باستخدام GameLogic
+        new_state, status = logic.try_move_manual(simulation_state, block_id, (dx, dy), distance)
+        
+        if status in [MOVE_SUCCESS, MOVE_EXIT]:
+            valid_moves.append(action)
+            simulation_state = new_state
+        else:
+            print(f"Warning: Move {action} is not valid in simulation state. Stopping extraction.")
+            break
+    
+    print(f"Extracted {len(valid_moves)} valid moves out of {len(moves)} moves from solution path")
+    return valid_moves
+
+def run_game(level_index=0, algorithm_name="BFS"):
     try:
         current_level = level_index % len(LEVEL_FILES)
         LEVEL_FILE = LEVEL_FILES[current_level]
         
+        print(f"Loading level: {LEVEL_FILE}")
         initial_state = load_game_state(LEVEL_FILE)
         
         if initial_state is None:
@@ -68,10 +123,24 @@ def run_game(level_index=0):
         
         is_ai_playing = False
         ai_solution_path = []
-        ai_move_delay = 500
+        ai_move_delay = 500  # سرعة الحركة بالمللي ثانية
         last_ai_move_time = 0
         
-        ai_solver = AStarSolver()
+        # تعريف الخوارزمية حسب الاختيار
+        algorithm_map = {
+            "BFS": BFSSolver,
+            "DFS": DFSSolver,
+            "UCS": UCSSolver,
+            "Greedy": GreedySolver,
+            "A*": AStarSolver
+        }
+        
+        if algorithm_name not in algorithm_map:
+            print(f"Warning: Algorithm '{algorithm_name}' not found. Defaulting to BFS.")
+            algorithm_name = "BFS"
+        
+        ai_solver_class = algorithm_map[algorithm_name]
+        ai_solver = ai_solver_class()
 
         clock = pygame.time.Clock()
         
@@ -80,25 +149,52 @@ def run_game(level_index=0):
 
             if is_ai_playing and ai_solution_path:
                 if current_time - last_ai_move_time > ai_move_delay:
-                    action = ai_solution_path.pop(0)
-                    block_id, dx, dy, distance = action
-                    
-                    new_state, status = logic.try_move_manual(current_state, block_id, (dx, dy), distance)
-                    
-                    if status in [MOVE_SUCCESS, MOVE_EXIT]:
-                        current_state = new_state
-                        move_count += 1
-                        if status == MOVE_SUCCESS:
-                            sound_manager.play_move()
+                    if len(ai_solution_path) > 0:
+                        action = ai_solution_path[0]  # ننظر إلى الحركة التالية دون إزالتها
+                        block_id, dx, dy, distance = action
+                        
+                        print(f"\nAI attempting move {len(ai_solution_path)}: {action}")
+                        
+                        # التحقق من صحة الحركة قبل التنفيذ
+                        if not current_state.is_move_valid(block_id, (dx, dy), distance):
+                            print(f"Move {action} is no longer valid! Stopping AI.")
+                            is_ai_playing = False
+                            message = f"AI stopped: Move {action} became invalid"
+                            ai_solution_path = []
                         else:
-                            sound_manager.play_exit()
+                            # تنفيذ الحركة
+                            new_state, status = logic.try_move_manual(current_state, block_id, (dx, dy), distance)
+                            
+                            if status in [MOVE_SUCCESS, MOVE_EXIT]:
+                                # نجاح الحركة، ننتقل للحركة التالية
+                                current_state = new_state
+                                move_count += 1
+                                ai_solution_path.pop(0)  # إزالة الحركة المنفذة
+                                
+                                if status == MOVE_SUCCESS:
+                                    sound_manager.play_move()
+                                    print(f"Move successful. Remaining moves: {len(ai_solution_path)}")
+                                else:
+                                    sound_manager.play_exit()
+                                    print(f"Exit successful. Remaining moves: {len(ai_solution_path)}")
+                            else:
+                                print(f"Move execution failed unexpectedly. Stopping AI.")
+                                is_ai_playing = False
+                                message = f"AI stopped: Move execution failed"
+                                ai_solution_path = []
                     
                     last_ai_move_time = current_time
 
-                    if not ai_solution_path:
+                    # إذا نفذت كل الحركات
+                    if not ai_solution_path and is_ai_playing:
                         is_ai_playing = False
-                        message = "AI finished solving!"
-                        pygame.time.set_timer(pygame.USEREVENT + 1, 3000)
+                        if current_state.check_win_condition():
+                            message = f"AI solved the puzzle in {move_count} moves!"
+                            sound_manager.play_win()
+                            print("Puzzle solved by AI!")
+                        else:
+                            message = f"AI completed path with {len(current_state.blocks)} blocks remaining."
+                            print(f"AI path completed. Blocks left: {len(current_state.blocks)}")
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -108,11 +204,76 @@ def run_game(level_index=0):
                     if event.key == pygame.K_ESCAPE:
                         running = False
                     
+                    if event.key == pygame.K_s:  # بدء/إيقاف الـ AI
+                        if is_ai_playing:
+                            # إيقاف الـ AI إذا كان يعمل
+                            is_ai_playing = False
+                            ai_solution_path = []
+                            message = "AI stopped."
+                            print("AI stopped by user.")
+                        else:
+                            # بدء الـ AI من الحالة الحالية فقط
+                            message = f"{algorithm_name} is solving from current state..."
+                            viz.draw(current_state, move_count=move_count, message=message)
+                            pygame.display.flip()
+
+                            # استخدام الخوارزمية المحددة
+                            print(f"\n{'='*50}")
+                            print(f"Starting AI solver ({ai_solver.name}) from CURRENT state...")
+                            print(f"Current state has {len(current_state.blocks)} blocks")
+                            print(f"Blocks IDs: {[block.id for block in current_state.blocks]}")
+                            
+                            # إعادة تهيئة الخوارزمية لحل من الحالة الحالية فقط
+                            ai_solver = ai_solver_class()
+                            solution_path = ai_solver.solve(current_state)
+                            
+                            if solution_path:
+                                print(f"Found solution path with {len(solution_path)} states")
+                                
+                                # استخراج الحركات الصالحة من الحل
+                                ai_solution_path = extract_moves_from_solution_path(solution_path, current_state)
+                                
+                                if ai_solution_path:
+                                    print(f"Found {len(ai_solution_path)} valid moves from current state")
+                                    print(f"First 5 moves:")
+                                    for i, action in enumerate(ai_solution_path[:5]):
+                                        print(f"  Move {i+1}: {action}")
+                                    
+                                    # التحقق من أن الحركة الأولى صالحة في الحالة الحالية
+                                    if ai_solution_path:
+                                        first_action = ai_solution_path[0]
+                                        block_id, dx, dy, distance = first_action
+                                        
+                                        if current_state.is_move_valid(block_id, (dx, dy), distance):
+                                            is_ai_playing = True
+                                            last_ai_move_time = 0
+                                            
+                                            if solution_path[-1].check_win_condition():
+                                                message = f"AI found solution in {len(ai_solution_path)} moves! Now playing..."
+                                                print(f"Complete solution found! {len(ai_solution_path)} moves to win.")
+                                            else:
+                                                message = f"AI found best path ({len(ai_solution_path)} moves) to improve state."
+                                                print(f"Best path found. Target has {len(solution_path[-1].blocks)} blocks.")
+                                        else:
+                                            message = f"Error: First move {first_action} is not valid."
+                                            print(f"ERROR: First move is invalid in current state!")
+                                else:
+                                    message = f"{algorithm_name}: No valid moves found in solution."
+                                    print("No valid moves could be extracted from solution.")
+                            else:
+                                message = f"{algorithm_name}: No solution found from current state."
+                                print("No solution found from current state.")
+                            print(f"{'='*50}\n")
+                        
+                        pygame.time.set_timer(pygame.USEREVENT + 1, 3000)
+                        continue
+
                     if is_ai_playing:
+                        # إذا كان الـ AI يعمل، أي زر يوقفه
                         is_ai_playing = False
                         ai_solution_path = []
-                        message = "AI play stopped."
-                        pygame.time.set_timer(pygame.USEREVENT + 1, 2000)
+                        message = "AI stopped by user."
+                        print("AI stopped by user input.")
                         continue
 
                     if event.key == pygame.K_u:
@@ -139,38 +300,6 @@ def run_game(level_index=0):
                     elif event.key == pygame.K_p:
                         logic.print_possible_moves(current_state)
                     
-                    elif event.key == pygame.K_s:
-                        message = "AI is solving..."
-                        viz.draw(current_state, move_count=move_count, message=message)
-                        pygame.display.flip()
-
-                        solution_path = ai_solver.solve(current_state)
-                        
-                        if solution_path:
-                            ai_solution_path = []
-                            temp_state = solution_path[0]
-                            for i in range(1, len(solution_path)):
-                                found_action = None
-                                for next_state, action in temp_state.get_possible_moves():
-                                    if next_state.get_hashable_key() == solution_path[i].get_hashable_key():
-                                        found_action = action
-                                        break
-                                if found_action:
-                                    ai_solution_path.append(found_action)
-                                    temp_state = solution_path[i]
-
-                            if ai_solution_path:
-                                is_ai_playing = True
-                                last_ai_move_time = 0
-                                message = "AI is now playing..."
-                                print(f"Solution found in {len(solution_path)-1} moves! ({ai_solver.nodes_explored} nodes explored)")
-                            else:
-                                 message = "Could not reconstruct solution path."
-                        else:
-                            message = "No solution found!"
-                        
-                        pygame.time.set_timer(pygame.USEREVENT + 1, 3000)
-
                     elif control_mode == "keyboard" and not is_ai_playing:
                         if event.key == pygame.K_TAB:
                             new_state = logic.select_next_block(current_state, not event.mod & pygame.KMOD_SHIFT)
@@ -284,7 +413,9 @@ def run_game(level_index=0):
             
             trapped_indices = current_state.get_trapped_block_indices()
                  
-            viz.draw(current_state, selected_block_coords=selected_coords, move_count=move_count, message=message, control_mode=control_mode, trapped_block_indices=trapped_indices)
+            viz.draw(current_state, selected_block_coords=selected_coords, move_count=move_count, 
+                    message=message, control_mode=control_mode, trapped_block_indices=trapped_indices,
+                    is_ai_playing=is_ai_playing)
             clock.tick(60)
             
         pygame.quit()
@@ -301,36 +432,60 @@ def run_game(level_index=0):
 def show_level_selection():
     try:
         pygame.init()
-        screen = pygame.display.set_mode((600, 400))
+        screen = pygame.display.set_mode((800, 500))
         pygame.display.set_caption("The Chroma Escape - Level Selection")
         clock = pygame.time.Clock()
         
         try:
             font = pygame.font.Font(None, 36)
-            small_font = pygame.font.SysFont(None, 24)
+            small_font = pygame.font.Font(None, 24)
+            medium_font = pygame.font.Font(None, 20)
         except pygame.error:
             font = pygame.font.SysFont(None, 36)
             small_font = pygame.font.SysFont(None, 24)
+            medium_font = pygame.font.SysFont(None, 20)
+        
+        algorithms = ["BFS", "DFS", "UCS", "Greedy", "A*"]
+        selected_algorithm = 0
+        selected_level = 0
         
         running = True
         while running:
             screen.fill((240, 240, 240))
             
-            title_text = font.render("Select Level", True, (0, 0, 0))
-            title_rect = title_text.get_rect(center=(300, 50))
+            title_text = font.render("The Chroma Escape - Level Selection", True, (0, 0, 0))
+            title_rect = title_text.get_rect(center=(400, 50))
             screen.blit(title_text, title_rect)
+            
+            # عرض المستويات
+            level_text = medium_font.render("Select Level:", True, (0, 0, 0))
+            screen.blit(level_text, (50, 100))
             
             for i, level_file in enumerate(LEVEL_FILES):
                 level_name = os.path.basename(level_file).replace(".json", "").replace("_", " ").title()
-                level_text = small_font.render(f"{i+1}. {level_name}", True, (0, 0, 0))
-                level_rect = level_text.get_rect(center=(300, 120 + i * 40))
-                screen.blit(level_text, level_rect)
+                color = (0, 100, 0) if i == selected_level else (0, 0, 0)
+                level_display = small_font.render(f"{i+1}. {level_name}", True, color)
+                screen.blit(level_display, (70, 130 + i * 30))
             
-            max_level = len(LEVEL_FILES)
-            instructions_text = f"Press 1-{max_level} to select a level, ESC to quit"
-            instructions = small_font.render(instructions_text, True, (0, 0, 0))
-            instructions_rect = instructions.get_rect(center=(300, 350))
-            screen.blit(instructions, instructions_rect)
+            # عرض خوارزميات البحث
+            algo_text = medium_font.render("Select Algorithm:", True, (0, 0, 0))
+            screen.blit(algo_text, (50, 250))
+            
+            for i, algo in enumerate(algorithms):
+                color = (0, 100, 0) if i == selected_algorithm else (0, 0, 0)
+                algo_display = small_font.render(f"{i+1}. {algo}", True, color)
+                screen.blit(algo_display, (70, 280 + i * 30))
+            
+            # تعليمات
+            instructions = [
+                "UP/DOWN: Navigate",
+                "ENTER: Start Game",
+                "ESC: Quit"
+            ]
+            
+            for i, instruction in enumerate(instructions):
+                inst_text = small_font.render(instruction, True, (100, 100, 100))
+                screen.blit(inst_text, (400, 300 + i * 25))
             
             pygame.display.flip()
             
@@ -340,10 +495,17 @@ def show_level_selection():
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         running = False
-                    elif pygame.K_1 <= event.key <= pygame.K_1 + len(LEVEL_FILES) - 1:
-                        level_index = event.key - pygame.K_1
+                    elif event.key == pygame.K_UP:
+                        selected_level = (selected_level - 1) % len(LEVEL_FILES)
+                    elif event.key == pygame.K_DOWN:
+                        selected_level = (selected_level + 1) % len(LEVEL_FILES)
+                    elif event.key == pygame.K_LEFT:
+                        selected_algorithm = (selected_algorithm - 1) % len(algorithms)
+                    elif event.key == pygame.K_RIGHT:
+                        selected_algorithm = (selected_algorithm + 1) % len(algorithms)
+                    elif event.key == pygame.K_RETURN:
                         pygame.quit()
-                        run_game(level_index)
+                        run_game(selected_level, algorithms[selected_algorithm])
                         return
             
             clock.tick(30)

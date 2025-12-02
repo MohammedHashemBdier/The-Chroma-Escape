@@ -1,4 +1,3 @@
-# هذا الملف يجعل المجلد package بايثون
 from .base import SearchAlgorithm
 from .bfs import BFSSolver
 from .dfs import DFSSolver

@@ -4,10 +4,6 @@ from model import GameState
 from .base import SearchAlgorithm
 
 class GreedySolver(SearchAlgorithm):
-    """
-    خوارزمية البحث الجشع (Greedy Best-First Search).
-    تستخدم دالة التقييم h(n) فقط. سريعة ولكن غير مضمونة الأمثلية.
-    """
     def __init__(self):
         super().__init__("Greedy")
 
@@ -15,24 +11,42 @@ class GreedySolver(SearchAlgorithm):
         if initial_state.check_win_condition():
             return [initial_state]
 
-        # frontier (الحافة) هي قائمة أولويات (heap)
-        # العنصر في الـ heap هو (التقييم, العداد, الحالة)
-        frontier = [(initial_state.evaluate_state(), 0, initial_state)]
-        heapq.heapify(frontier)
-        explored: Set[GameState] = {initial_state}
+        frontier = []
+        heapq.heappush(frontier, (initial_state.evaluate_state(), 0, initial_state))
+        explored: Set[GameState] = set()
         counter = 1
+        
+        # تحديث أفضل حالة بالحالة الأولية
+        self.best_state_found = initial_state
+        self.best_score = self._evaluate_state(initial_state)
+        
+        print(f"Starting Greedy solver...")
 
         while frontier:
-            _, _, state = heapq.heappop(frontier)
+            heuristic, _, state = heapq.heappop(frontier)
             self.nodes_explored += 1
+            
+            if state in explored:
+                continue
+            explored.add(state)
 
-            for next_state, _ in state.get_possible_moves():
-                if next_state.check_win_condition():
-                    return self.reconstruct_path(next_state)
+            # تحديث أفضل حالة
+            self._update_best_state(state)
 
+            if self.nodes_explored % 1000 == 0:
+                print(f"Greedy: Nodes explored: {self.nodes_explored}")
+
+            if state.check_win_condition():
+                print(f"Greedy Solution found! Total nodes explored: {self.nodes_explored}")
+                return self.reconstruct_path(state)
+
+            for next_state, action in state.get_possible_moves():
                 if next_state not in explored:
-                    explored.add(next_state)
                     heapq.heappush(frontier, (next_state.evaluate_state(), counter, next_state))
                     counter += 1
         
-        return None
+        # إذا وصلنا هنا ولم نجد حل، نعيد أفضل حالة
+        print(f"Greedy: No solution found. Best state has {len(self.best_state_found.blocks)} blocks remaining.")
+        print(f"Total nodes explored: {self.nodes_explored}")
+        
+        return self.reconstruct_path(self.best_state_found)

@@ -35,16 +35,18 @@ class GameVisualizer:
 
         os.environ['SDL_VIDEO_WINDOW_POS'] = f"{(screen_w - self.screen_width) // 2},{(screen_h - self.screen_height) // 2}"
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
-        pygame.display.set_caption("The Chroma Escape - Smart Search")
+        pygame.display.set_caption("The Chroma Escape - Smart Search Algorithms")
         
         self.clock = pygame.time.Clock()
         
         try:
             self.font = pygame.font.Font(None, 36)
             self.small_font = pygame.font.Font(None, 24)
+            self.medium_font = pygame.font.Font(None, 20)
         except pygame.error:
             self.font = pygame.font.SysFont(None, 36)
             self.small_font = pygame.font.SysFont(None, 24)
+            self.medium_font = pygame.font.SysFont(None, 20)
         
         self.particles = []
 
@@ -250,57 +252,75 @@ class GameVisualizer:
         
         pygame.display.flip()
     
-    def draw_ui(self, state: GameState, move_count=0, message="", control_mode="mouse"):
+    def draw_ui(self, state: GameState, move_count=0, message="", control_mode="mouse", 
+                is_ai_playing=False):
+        # معلومات اللعبة
         moves_text = self.small_font.render(f"Moves: {move_count}", True, (0, 0, 0))
         self.screen.blit(moves_text, (10, 10))
         
         blocks_text = self.small_font.render(f"Blocks: {len(state.blocks)}", True, (0, 0, 0))
-        self.screen.blit(blocks_text, (10, 40))
+        self.screen.blit(blocks_text, (10, 35))
+        
+        ai_status = "AI: Playing" if is_ai_playing else "AI: Ready"
+        ai_color = (0, 100, 0) if is_ai_playing else (100, 0, 0)
+        ai_text = self.small_font.render(ai_status, True, ai_color)
+        self.screen.blit(ai_text, (10, 60))
 
-        y_offset = 70
-        for color, lock_value in state.display_lock.items():
-            lock_text = self.small_font.render(f"{color.capitalize()}: {lock_value}", True, (0, 0, 0))
+        y_offset = 85
+        if state.display_lock:
+            lock_text = self.small_font.render("Move Locks:", True, (0, 0, 0))
             self.screen.blit(lock_text, (10, y_offset))
             y_offset += 25
+            
+            for color, lock_value in state.display_lock.items():
+                lock_display = self.small_font.render(f"{color.capitalize()}: {lock_value}", True, (0, 0, 0))
+                self.screen.blit(lock_display, (20, y_offset))
+                y_offset += 20
 
         if state.selected_block_index is not None and state.selected_block_index < len(state.blocks):
             selected_block = state.blocks[state.selected_block_index]
-            lock_text = f"Selected: {selected_block.color.capitalize()} (Lock: {selected_block.move_lock})"
-            lock_surface = self.small_font.render(lock_text, True, (0, 0, 0))
-            self.screen.blit(lock_surface, (10, y_offset))
+            selected_text = self.small_font.render(f"Selected: {selected_block.color.capitalize()}", True, (0, 0, 0))
+            self.screen.blit(selected_text, (10, y_offset))
+            y_offset += 25
         
         if message:
-            msg_text = self.small_font.render(message, True, (255, 0, 0))
-            msg_rect = msg_text.get_rect(center=(self.screen_width // 2, 30))
+            msg_bg = pygame.Surface((self.screen_width - 20, 30), pygame.SRCALPHA)
+            msg_bg.fill((255, 255, 200, 200))
+            self.screen.blit(msg_bg, (10, self.screen_height - 200))
+            
+            msg_text = self.medium_font.render(message, True, (200, 0, 0))
+            msg_rect = msg_text.get_rect(center=(self.screen_width // 2, self.screen_height - 185))
             self.screen.blit(msg_text, msg_rect)
+        
+        # أوامر التحكم
+        control_y = self.screen_height - 150
+        control_bg = pygame.Surface((self.screen_width - 20, 140), pygame.SRCALPHA)
+        control_bg.fill((200, 200, 255, 150))
+        self.screen.blit(control_bg, (10, control_y))
         
         if control_mode == "keyboard":
             instructions = [
-                "Use TAB to select blocks",
-                "Use ARROW KEYS or WASD to move",
-                "Press U to undo last move",
-                "Press R to restart level",
-                "Press M to switch to mouse control",
-                "Press P to print possible moves",
-                "Press S to solve with AI",
-                "Press ESC to quit"
+                "TAB: Select blocks",
+                "ARROWS/WASD: Move",
+                "U: Undo | R: Restart",
+                "M: Mouse mode | P: Possible moves",
+                "S: Start/Stop AI | ESC: Quit"
             ]
         else:
             instructions = [
-                "Click and drag to move blocks",
-                "Press K to switch to keyboard control",
-                "Press U to undo last move",
-                "Press R to restart level",
-                "Press P to print possible moves",
-                "Press S to solve with AI",
-                "Press ESC to quit"
+                "Click & Drag: Move blocks",
+                "K: Keyboard mode",
+                "U: Undo | R: Restart",
+                "P: Possible moves",
+                "S: Start/Stop AI | ESC: Quit"
             ]
         
-        y_pos = self.screen_height - 160
+        # رسم التعليمات
+        inst_y = control_y + 10
         for instruction in instructions:
-            inst_text = self.small_font.render(instruction, True, (0, 0, 0))
-            self.screen.blit(inst_text, (10, y_pos))
-            y_pos += 25
+            inst_text = self.medium_font.render(instruction, True, (0, 0, 0))
+            self.screen.blit(inst_text, (20, inst_y))
+            inst_y += 20
     
     def _draw_particles(self):
         for particle in self.particles[:]:
@@ -336,7 +356,9 @@ class GameVisualizer:
                 'life': 30
             })
 
-    def draw(self, state: GameState, selected_block_coords: set = None, move_count=0, message="", control_mode="mouse", trapped_block_indices=None):
+    def draw(self, state: GameState, selected_block_coords: set = None, move_count=0, 
+             message="", control_mode="mouse", trapped_block_indices=None,
+             is_ai_playing=False):
         self.screen.fill(BACKGROUND_COLOR)
         
         for x, y in state.board.barriers:
@@ -362,14 +384,15 @@ class GameVisualizer:
             display_lock_value = block.move_lock if block.move_lock > 0 else -1
             
             for x, y in block.get_absolute_coords():
-                self._draw_cell(x, y, color, is_selected=is_selected, is_locked=is_locked, is_trapped=is_trapped_by_obstacles, display_lock=display_lock_value)
+                self._draw_cell(x, y, color, is_selected=is_selected, is_locked=is_locked, 
+                              is_trapped=is_trapped_by_obstacles, display_lock=display_lock_value)
 
             self._draw_movement_arrow(block, is_selected=is_selected)
         
         self._draw_particles()
         self._draw_grid(state.board.exits)
         
-        self.draw_ui(state, move_count, message, control_mode)
+        self.draw_ui(state, move_count, message, control_mode, is_ai_playing)
         
         pygame.display.flip()
     

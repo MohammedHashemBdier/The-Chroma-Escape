@@ -4,11 +4,6 @@ from model import GameState
 from .base import SearchAlgorithm
 
 class AStarSolver(SearchAlgorithm):
-    """
-    خوارزمية A* (A-Star).
-    تجمع بين تكلفة المسار g(n) والتقييم h(n).
-    تضمن إيجاد الحل الأمثل إذا كانت h(n) مقبولة (admissible).
-    """
     def __init__(self):
         super().__init__("A*")
 
@@ -16,28 +11,45 @@ class AStarSolver(SearchAlgorithm):
         if initial_state.check_win_condition():
             return [initial_state]
 
-        # frontier (الحافة) هي قائمة أولويات (heap)
-        # العنصر في الـ heap هو (f(n), g(n), العداد, الحالة)
-        # حيث f(n) = g(n) + h(n)
-        frontier = [(initial_state.evaluate_state(), 0, 0, initial_state)]
-        heapq.heapify(frontier)
-        explored: Set[GameState] = {initial_state}
+        frontier = []
+        heapq.heappush(frontier, (initial_state.evaluate_state(), 0, 0, initial_state))
+        explored: Set[GameState] = set()
         counter = 1
-
+        
+        # تحديث أفضل حالة بالحالة الأولية
+        self.best_state_found = initial_state
+        self.best_score = self._evaluate_state(initial_state)
+        
+        print(f"Starting A* solver...")
+        
         while frontier:
-            _, g, _, state = heapq.heappop(frontier)
+            f_cost, g_cost, _, state = heapq.heappop(frontier)
             self.nodes_explored += 1
+            
+            if state in explored:
+                continue
+            explored.add(state)
 
-            for next_state, _ in state.get_possible_moves():
-                if next_state.check_win_condition():
-                    return self.reconstruct_path(next_state)
+            # تحديث أفضل حالة
+            self._update_best_state(state)
 
+            if self.nodes_explored % 1000 == 0:
+                print(f"A*: Nodes explored: {self.nodes_explored}")
+
+            if state.check_win_condition():
+                print(f"A* Solution found! Total nodes explored: {self.nodes_explored}")
+                return self.reconstruct_path(state)
+
+            for next_state, action in state.get_possible_moves():
                 if next_state not in explored:
-                    g_new = g + 1
+                    g_new = g_cost + 1
                     h_new = next_state.evaluate_state()
                     f_new = g_new + h_new
-                    explored.add(next_state)
                     heapq.heappush(frontier, (f_new, g_new, counter, next_state))
                     counter += 1
         
-        return None
+        # إذا وصلنا هنا ولم نجد حل، نعيد أفضل حالة
+        print(f"A*: No solution found. Best state has {len(self.best_state_found.blocks)} blocks remaining.")
+        print(f"Total nodes explored: {self.nodes_explored}")
+        
+        return self.reconstruct_path(self.best_state_found)

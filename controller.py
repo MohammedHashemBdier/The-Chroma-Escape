@@ -41,12 +41,16 @@ class GameLogic:
         for block_id, moves in moves_by_block.items():
             if block_id in blocks_by_id:
                 block = blocks_by_id[block_id]
-                print(f"\nBlock ID: {block_id} | Color: {block.color.capitalize()} | Position: ({block.x}, {block.y})")
+                print(f"\nBlock ID: {block_id} | Color: {block.color.capitalize()} | Position: ({block.x}, {block.y}) | Lock: {block.move_lock}")
                 print("-" * 30)
                 if not moves:
                     print("  No valid moves for this block.")
                 else:
                     for dx, dy, distance in moves:
+                        if distance == 0 and dx == 0 and dy == 0:
+                            print(f"  - EXIT: Block can exit immediately (no movement needed)")
+                            continue
+                            
                         direction_str = ""
                         if dx > 0:
                             direction_str = "RIGHT"
@@ -63,9 +67,17 @@ class GameLogic:
         print("\n" + "="*50)
 
     def try_move_manual(self, current_state: GameState, block_id: int, direction_vector: tuple, distance: int) -> tuple:
-        if distance <= 0:
+        # التحقق الأساسي
+        if distance not in [0, 1]:
+            print(f"Error: Invalid distance {distance}. Must be 0 or 1.")
             return (current_state, MOVE_INVALID)
-
+        
+        # التحقق من صحة الحركة في الحالة الحالية
+        if not current_state.is_move_valid(block_id, direction_vector, distance):
+            print(f"Error: Move ({block_id}, {direction_vector}, {distance}) is not valid in current state")
+            return (current_state, MOVE_INVALID)
+        
+        # البحث عن القطعة
         block_index = -1
         for i, block in enumerate(current_state.blocks):
             if block.id == block_id:
@@ -76,24 +88,25 @@ class GameLogic:
             return (current_state, MOVE_INVALID)
 
         block = current_state.blocks[block_index]
-        if block.move_lock > 0:
-            return (current_state, MOVE_INVALID)
-
         dx, dy = direction_vector
-        board = current_state.board
+        
+        # حركة خروج مباشرة
+        if distance == 0 and dx == 0 and dy == 0:
+            action_tuple = (block_id, 0, 0, 0)
+            new_state = self._create_new_state_after_exit(current_state, block_index, action_tuple)
+            self.move_history.append((current_state, action_tuple))
+            return (new_state, MOVE_EXIT)
+        
+        # حركة عادية
+        action_tuple = (block_id, dx, dy, distance)
 
-        if (dx != 0 and block.movement_type == MovementType.VERTICAL) or \
-           (dy != 0 and block.movement_type == MovementType.HORIZONTAL):
-            return (current_state, MOVE_INVALID)
-
-        if not current_state._is_path_clear_for_distance(block, (dx, dy), distance, block_index):
-            return (current_state, MOVE_INVALID)
-
-        if board.would_be_adjacent_to_exit_after_move(block, (dx, dy), distance):
-            new_state = self._create_new_state_after_exit(current_state, block_index)
-            self.move_history.append((current_state, (block_id, dx, dy, distance)))
+        # إذا كانت الحركة ستجعل القطعة مجاورة للمخرج
+        if current_state.board.would_be_adjacent_to_exit_after_move(block, (dx, dy), distance):
+            new_state = self._create_new_state_after_exit(current_state, block_index, action_tuple)
+            self.move_history.append((current_state, action_tuple))
             return (new_state, MOVE_EXIT)
 
+        # حركة عادية بدون خروج
         final_x = block.x + dx * distance
         final_y = block.y + dy * distance
         
@@ -102,8 +115,8 @@ class GameLogic:
             shape=block.shape, movement_type=block.movement_type, id=block.id, move_lock=block.move_lock
         )
         
-        new_state = self._create_new_state_after_move(current_state, block_index, moved_block)
-        self.move_history.append((current_state, (block_id, dx, dy, distance)))
+        new_state = self._create_new_state_after_move(current_state, block_index, moved_block, action_tuple)
+        self.move_history.append((current_state, action_tuple))
         return (new_state, MOVE_SUCCESS)
     
     def try_move_keyboard(self, current_state: GameState, direction: str) -> tuple:
@@ -134,21 +147,21 @@ class GameLogic:
         previous_state, _ = self.move_history.pop()
         return (previous_state, MOVE_SUCCESS)
     
-    def _create_new_state_after_move(self, current_state: GameState, block_index: int, moved_block: Block) -> GameState:
+    def _create_new_state_after_move(self, current_state: GameState, block_index: int, moved_block: Block, action: tuple) -> GameState:
         new_blocks = current_state.blocks[:]
         new_blocks[block_index] = moved_block
         
-        new_state = GameState(board=current_state.board, blocks=new_blocks, parent=current_state)
+        new_state = GameState(board=current_state.board, blocks=new_blocks, parent=current_state, action=action)
         new_state.selected_block_index = current_state.selected_block_index
         new_state.move_count = current_state.move_count + 1
         new_state._inherit_display_locks(current_state)
         return new_state
     
-    def _create_new_state_after_exit(self, current_state: GameState, block_index: int) -> GameState:
+    def _create_new_state_after_exit(self, current_state: GameState, block_index: int, action: tuple) -> GameState:
         new_blocks = copy.deepcopy(current_state.blocks)
         new_blocks.pop(block_index)
         
-        new_state = GameState(board=current_state.board, blocks=new_blocks, parent=current_state)
+        new_state = GameState(board=current_state.board, blocks=new_blocks, parent=current_state, action=action)
         new_state.selected_block_index = None
         new_state.move_count = current_state.move_count + 1
         new_state._inherit_display_locks(current_state)
