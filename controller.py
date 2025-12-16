@@ -155,6 +155,7 @@ class GameLogic:
         new_state.selected_block_index = current_state.selected_block_index
         new_state.move_count = current_state.move_count + 1
         new_state._inherit_display_locks(current_state)
+        new_state.decrease_all_move_locks()
         return new_state
     
     def _create_new_state_after_exit(self, current_state: GameState, block_index: int, action: tuple) -> GameState:

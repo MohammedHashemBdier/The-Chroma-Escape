@@ -82,7 +82,7 @@ def extract_moves_from_solution_path(solution_path, current_state):
     print(f"Extracted {len(valid_moves)} moves from solution path")
     return valid_moves
 
-def run_game(level_index=0, algorithm_name="BFS"):
+def run_game(level_index=0, algorithm_name="A*"):
     try:
         current_level = level_index % len(LEVEL_FILES)
         LEVEL_FILE = LEVEL_FILES[current_level]

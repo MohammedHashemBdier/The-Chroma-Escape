@@ -27,6 +27,11 @@ class DFSRecursiveSolver(SearchAlgorithm):
         else:
             print(f"DFS Recursive: No solution found. Best state has {len(self.best_state_found.blocks)} blocks remaining.")
             print(f"Total nodes explored: {self.nodes_explored}")
+            
+            # إذا كانت أفضل حالة لم تقلل عدد القطع، نعيد الحالة الأولية
+            if len(self.best_state_found.blocks) >= len(initial_state.blocks):
+                return [initial_state]
+            
             return self.reconstruct_path(self.best_state_found)
 
     def _dfs_recursive(self, state: GameState, depth: int) -> Optional[List[GameState]]:
@@ -49,6 +54,8 @@ class DFSRecursiveSolver(SearchAlgorithm):
             return None
         
         possible_moves = state.get_possible_moves()
+        # فرز الحركات حسب التقييم (الأفضل أولاً)
+        possible_moves.sort(key=lambda x: self._evaluate_state(x[0]))
         
         for next_state, action in possible_moves:
             if next_state not in self.explored:

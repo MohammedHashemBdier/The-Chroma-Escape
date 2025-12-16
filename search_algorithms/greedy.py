@@ -49,4 +49,8 @@ class GreedySolver(SearchAlgorithm):
         print(f"Greedy: No solution found. Best state has {len(self.best_state_found.blocks)} blocks remaining.")
         print(f"Total nodes explored: {self.nodes_explored}")
         
+        # إذا كانت أفضل حالة لم تقلل عدد القطع، نعيد الحالة الأولية
+        if len(self.best_state_found.blocks) >= len(initial_state.blocks):
+            return [initial_state]
+        
         return self.reconstruct_path(self.best_state_found)

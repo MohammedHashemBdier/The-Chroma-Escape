@@ -1,3 +1,4 @@
+import heapq
 from typing import List, Optional, Set
 from model import GameState
 from .base import SearchAlgorithm
@@ -10,8 +11,10 @@ class DFSSolver(SearchAlgorithm):
         if initial_state.check_win_condition():
             return [initial_state]
 
-        frontier = [initial_state]
+        frontier = []
+        heapq.heappush(frontier, (self._evaluate_state(initial_state), 0, initial_state))
         explored: Set[GameState] = set()
+        counter = 1
         
         # تحديث أفضل حالة بالحالة الأولية
         self.best_state_found = initial_state
@@ -23,7 +26,7 @@ class DFSSolver(SearchAlgorithm):
         iteration = 0
         
         while frontier:
-            state = frontier.pop()
+            f_cost, _, state = heapq.heappop(frontier)
             self.nodes_explored += 1
             
             if state in explored:
@@ -45,10 +48,15 @@ class DFSSolver(SearchAlgorithm):
             if state.depth < depth_limit:
                 for next_state, action in state.get_possible_moves():
                     if next_state not in explored:
-                        frontier.append(next_state)
+                        heapq.heappush(frontier, (self._evaluate_state(next_state), counter, next_state))
+                        counter += 1
         
         # إذا وصلنا هنا ولم نجد حل، نعيد أفضل حالة
         print(f"DFS: No solution found. Best state has {len(self.best_state_found.blocks)} blocks remaining.")
         print(f"Total nodes explored: {self.nodes_explored}")
+        
+        # إذا كانت أفضل حالة لم تقلل عدد القطع، نعيد الحالة الأولية
+        if len(self.best_state_found.blocks) >= len(initial_state.blocks):
+            return [initial_state]
         
         return self.reconstruct_path(self.best_state_found)

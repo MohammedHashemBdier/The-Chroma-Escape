@@ -1,4 +1,5 @@
 from collections import deque
+import heapq
 from typing import List, Optional, Set
 from model import GameState
 from .base import SearchAlgorithm
@@ -12,9 +13,11 @@ class BFSSolver(SearchAlgorithm):
             print("BFS: Already at win condition!")
             return [initial_state]
 
-        frontier_queue = deque([initial_state])
+        frontier = []
+        heapq.heappush(frontier, (self._evaluate_state(initial_state), 0, initial_state))
         frontier_set = set([initial_state])
         explored: Set[GameState] = set()
+        counter = 1
         
         # لتخزين أفضل حالة
         self.best_state_found = initial_state
@@ -29,8 +32,8 @@ class BFSSolver(SearchAlgorithm):
         parent_map = {initial_state: None}
         
         iteration = 0
-        while frontier_queue:
-            state = frontier_queue.popleft()
+        while frontier:
+            f_cost, _, state = heapq.heappop(frontier)
             frontier_set.remove(state)
             iteration += 1
             
@@ -43,7 +46,7 @@ class BFSSolver(SearchAlgorithm):
 
             # طباعة التقدم
             if iteration % 1000 == 0:
-                print(f"BFS: Nodes explored: {self.nodes_explored}, Frontier: {len(frontier_queue)}")
+                print(f"BFS: Nodes explored: {self.nodes_explored}, Frontier: {len(frontier)}")
 
             if state.check_win_condition():
                 print(f"BFS Solution found! Total nodes explored: {self.nodes_explored}")
@@ -88,14 +91,15 @@ class BFSSolver(SearchAlgorithm):
                 if next_state not in explored and next_state not in frontier_set:
                     parent_map[next_state] = state
                     frontier_set.add(next_state)
-                    frontier_queue.append(next_state)
+                    heapq.heappush(frontier, (self._evaluate_state(next_state), counter, next_state))
+                    counter += 1
         
         # إذا وصلنا هنا ولم نجد حل، نعيد أفضل حالة
         print(f"BFS: No solution found. Best state has {len(self.best_state_found.blocks)} blocks remaining.")
         print(f"Total nodes explored: {self.nodes_explored}")
         
-        # إذا كانت أفضل حالة هي الحالة الأولية، نعيدها فقط
-        if self.best_state_found == initial_state:
+        # إذا كانت أفضل حالة هي الحالة الأولية أو لم تقلل عدد القطع، نعيدها فقط
+        if self.best_state_found == initial_state or len(self.best_state_found.blocks) >= len(initial_state.blocks):
             return [initial_state]
         
         # إعادة بناء المسار إلى أفضل حالة

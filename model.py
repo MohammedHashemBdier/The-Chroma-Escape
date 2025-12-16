@@ -223,13 +223,24 @@ class GameState:
     
     def _is_block_adjacent_to_exit(self, block: Block) -> bool:
         """تحقق إذا كانت القطعة مجاورة لمخرج من نفس لونها أو عليه في موقعها الحالي"""
+        occupied = self.get_occupied_coords()
         for x, y in block.get_absolute_coords():
             if self.board.is_exit_at(x, y):
                 exit_color = self.board.exits[(x, y)].get("color")
                 if exit_color and exit_color.lower() == block.color.lower():
                     return True
             if self.board.is_adjacent_to_exit(x, y, block.color):
-                return True
+                # تحقق إذا كان المنفذ فارغ
+                exit_pos = None
+                for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
+                    ex, ey = x + dx, y + dy
+                    if self.board.is_exit_at(ex, ey):
+                        exit_color = self.board.exits[(ex, ey)].get("color")
+                        if exit_color and exit_color.lower() == block.color.lower():
+                            exit_pos = (ex, ey)
+                            break
+                if exit_pos and exit_pos not in occupied:
+                    return True
         return False
     
     def __eq__(self, other):
@@ -290,13 +301,13 @@ class GameState:
         
         dx, dy = direction
         
-        # Allow moves that cause exit, even if invalid otherwise
-        if self.board.would_be_adjacent_to_exit_after_move(block, (dx, dy), distance):
-            return True
-        
         # Check path clear
         if not self._is_path_clear_for_distance(block, (dx, dy), distance, self.blocks.index(block)):
             return False
+        
+        # Allow moves that cause exit, even if invalid otherwise
+        if self.board.would_be_adjacent_to_exit_after_move(block, (dx, dy), distance):
+            return True
         
         # Check new position valid
         new_coords = set()
@@ -305,7 +316,7 @@ class GameState:
             y = block.y + dy * distance + shape_dy
             if not (0 <= x < self.board.width and 0 <= y < self.board.height):
                 return False
-            if (x, y) in self.board.barriers or (x, y) in self.board.exits:
+            if (x, y) in self.board.barriers:
                 return False
             new_coords.add((x, y))
         

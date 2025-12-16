@@ -65,4 +65,14 @@ class SearchAlgorithm(ABC):
         # عدد القطع المحاصرة (سالب)
         trapped_blocks = len(state.get_trapped_block_indices()) * 50
         
-        return remaining_blocks + total_distance * 0.5 - trapped_blocks
+        # عدد القطع المعيقة (تقف على منفذ ليس منفذها)
+        blocking_blocks = 0
+        for block in state.blocks:
+            for x, y in block.get_absolute_coords():
+                if state.board.is_exit_at(x, y):
+                    exit_color = state.board.exits[(x, y)].get("color")
+                    if exit_color and exit_color.lower() != block.color.lower():
+                        blocking_blocks += 1
+                        break
+        
+        return remaining_blocks + total_distance * 0.5 - trapped_blocks + blocking_blocks * 1000
