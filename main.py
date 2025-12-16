@@ -1,6 +1,5 @@
 import pygame
 import os
-import sys
 import copy
 import traceback
 import time
@@ -20,6 +19,7 @@ LEVEL_FILES = [
     "levels/level_01.json",
     "levels/level_02.json",
     "levels/level_03.json",
+    "levels/level_04.json",
 ]
 
 def show_error_screen(screen, font, error_message):
