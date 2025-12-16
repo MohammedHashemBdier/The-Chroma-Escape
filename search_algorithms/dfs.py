@@ -19,7 +19,7 @@ class DFSSolver(SearchAlgorithm):
         
         print(f"Starting DFS solver...")
         
-        depth_limit = 100  # حد العمق لتجنب التعمق الشديد
+        depth_limit = 500  # حد العمق لتجنب التعمق الشديد
         iteration = 0
         
         while frontier:

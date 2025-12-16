@@ -12,7 +12,7 @@ class AStarSolver(SearchAlgorithm):
             return [initial_state]
 
         frontier = []
-        heapq.heappush(frontier, (initial_state.evaluate_state(), 0, 0, initial_state))
+        heapq.heappush(frontier, (self._evaluate_state(initial_state), 0, 0, initial_state))
         explored: Set[GameState] = set()
         counter = 1
         
@@ -43,7 +43,7 @@ class AStarSolver(SearchAlgorithm):
             for next_state, action in state.get_possible_moves():
                 if next_state not in explored:
                     g_new = g_cost + 1
-                    h_new = next_state.evaluate_state()
+                    h_new = self._evaluate_state(next_state)
                     f_new = g_new + h_new
                     heapq.heappush(frontier, (f_new, g_new, counter, next_state))
                     counter += 1

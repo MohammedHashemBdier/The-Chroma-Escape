@@ -3,9 +3,13 @@ import os
 import sys
 import copy
 import traceback
+import time
 from controller import GameLogic, load_game_state, MOVE_SUCCESS, MOVE_INVALID, MOVE_EXIT
+from model import GameState
+from search_algorithms.astar import AStarSolver
 from search_algorithms.bfs import BFSSolver
 from search_algorithms.dfs import DFSSolver
+from search_algorithms.dfs_recursive import DFSRecursiveSolver
 from search_algorithms.ucs import UCSSolver
 from search_algorithms.greedy import GreedySolver
 from search_algorithms.astar import AStarSolver
@@ -15,6 +19,7 @@ from sound_manager import SoundManager
 LEVEL_FILES = [
     "levels/level_01.json",
     "levels/level_02.json",
+    "levels/level_03.json",
 ]
 
 def show_error_screen(screen, font, error_message):
@@ -72,24 +77,9 @@ def extract_moves_from_solution_path(solution_path, current_state):
             moves.append(state.action)
     
     # التحقق من أن الحركات متسلسلة ومتتابعة
-    valid_moves = []
-    simulation_state = copy.deepcopy(current_state)
-    logic = GameLogic()  # ننشئ نسخة جديدة للمحاكاة
+    valid_moves = moves
     
-    for action in moves:
-        block_id, dx, dy, distance = action
-        
-        # نطبق الحركة باستخدام GameLogic
-        new_state, status = logic.try_move_manual(simulation_state, block_id, (dx, dy), distance)
-        
-        if status in [MOVE_SUCCESS, MOVE_EXIT]:
-            valid_moves.append(action)
-            simulation_state = new_state
-        else:
-            print(f"Warning: Move {action} is not valid in simulation state. Stopping extraction.")
-            break
-    
-    print(f"Extracted {len(valid_moves)} valid moves out of {len(moves)} moves from solution path")
+    print(f"Extracted {len(valid_moves)} moves from solution path")
     return valid_moves
 
 def run_game(level_index=0, algorithm_name="BFS"):
@@ -130,6 +120,7 @@ def run_game(level_index=0, algorithm_name="BFS"):
         algorithm_map = {
             "BFS": BFSSolver,
             "DFS": DFSSolver,
+            "DFS_Recursive": DFSRecursiveSolver,
             "UCS": UCSSolver,
             "Greedy": GreedySolver,
             "A*": AStarSolver
@@ -157,10 +148,9 @@ def run_game(level_index=0, algorithm_name="BFS"):
                         
                         # التحقق من صحة الحركة قبل التنفيذ
                         if not current_state.is_move_valid(block_id, (dx, dy), distance):
-                            print(f"Move {action} is no longer valid! Stopping AI.")
-                            is_ai_playing = False
-                            message = f"AI stopped: Move {action} became invalid"
-                            ai_solution_path = []
+                            print(f"Move {action} is no longer valid! Skipping.")
+                            ai_solution_path.pop(0)  # إزالة الحركة غير الصالحة
+                            message = f"AI skipped invalid move: {action}"
                         else:
                             # تنفيذ الحركة
                             new_state, status = logic.try_move_manual(current_state, block_id, (dx, dy), distance)
@@ -193,8 +183,31 @@ def run_game(level_index=0, algorithm_name="BFS"):
                             sound_manager.play_win()
                             print("Puzzle solved by AI!")
                         else:
-                            message = f"AI completed path with {len(current_state.blocks)} blocks remaining."
-                            print(f"AI path completed. Blocks left: {len(current_state.blocks)}")
+                            if 'replan_count' not in globals():
+                                replan_count = 0
+                            replan_count += 1
+                            if replan_count > 1:
+                                message = "AI stuck, stopped re-planning"
+                                print("AI stuck after 1 re-plan")
+                            else:
+                                print(f"AI path completed but puzzle not solved (attempt {replan_count}). Re-planning...")
+                                print(f"Current state: {len(current_state.blocks)} blocks, IDs: {[block.id for block in current_state.blocks]}")
+                                ai_solver = ai_solver_class()
+                                start_time = time.time()
+                                new_solution_path = ai_solver.solve(current_state)
+                                end_time = time.time()
+                                solve_time = end_time - start_time
+                                if new_solution_path:
+                                    print(f"New solution found in {solve_time:.2f} seconds, {ai_solver.nodes_explored} nodes")
+                                    ai_solution_path = extract_moves_from_solution_path(new_solution_path, current_state)
+                                    print(f"New path has {len(ai_solution_path)} moves")
+                                    if ai_solution_path:
+                                        is_ai_playing = True
+                                        last_ai_move_time = current_time
+                                    else:
+                                        message = "No valid moves in new path"
+                                else:
+                                    message = "No new solution found"
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -225,10 +238,16 @@ def run_game(level_index=0, algorithm_name="BFS"):
                             
                             # إعادة تهيئة الخوارزمية لحل من الحالة الحالية فقط
                             ai_solver = ai_solver_class()
+                            start_time = time.time()
                             solution_path = ai_solver.solve(current_state)
+                            end_time = time.time()
+                            solve_time = end_time - start_time
                             
                             if solution_path:
                                 print(f"Found solution path with {len(solution_path)} states")
+                                print(f"Time taken: {solve_time:.2f} seconds")
+                                print(f"Nodes explored: {ai_solver.nodes_explored}")
+                                print(f"Moves to solution: {len(solution_path) - 1}")
                                 
                                 # استخراج الحركات الصالحة من الحل
                                 ai_solution_path = extract_moves_from_solution_path(solution_path, current_state)
@@ -263,6 +282,8 @@ def run_game(level_index=0, algorithm_name="BFS"):
                             else:
                                 message = f"{algorithm_name}: No solution found from current state."
                                 print("No solution found from current state.")
+                                print(f"Time taken: {solve_time:.2f} seconds")
+                                print(f"Nodes explored: {ai_solver.nodes_explored}")
                             print(f"{'='*50}\n")
                         
                         pygame.time.set_timer(pygame.USEREVENT + 1, 3000)
@@ -445,7 +466,7 @@ def show_level_selection():
             small_font = pygame.font.SysFont(None, 24)
             medium_font = pygame.font.SysFont(None, 20)
         
-        algorithms = ["BFS", "DFS", "UCS", "Greedy", "A*"]
+        algorithms = ["BFS", "DFS", "DFS_Recursive", "UCS", "Greedy", "A*"]
         selected_algorithm = 0
         selected_level = 0
         

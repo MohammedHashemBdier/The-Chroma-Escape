@@ -12,7 +12,7 @@ class GreedySolver(SearchAlgorithm):
             return [initial_state]
 
         frontier = []
-        heapq.heappush(frontier, (initial_state.evaluate_state(), 0, initial_state))
+        heapq.heappush(frontier, (self._evaluate_state(initial_state), 0, initial_state))
         explored: Set[GameState] = set()
         counter = 1
         
@@ -42,7 +42,7 @@ class GreedySolver(SearchAlgorithm):
 
             for next_state, action in state.get_possible_moves():
                 if next_state not in explored:
-                    heapq.heappush(frontier, (next_state.evaluate_state(), counter, next_state))
+                    heapq.heappush(frontier, (self._evaluate_state(next_state), counter, next_state))
                     counter += 1
         
         # إذا وصلنا هنا ولم نجد حل، نعيد أفضل حالة

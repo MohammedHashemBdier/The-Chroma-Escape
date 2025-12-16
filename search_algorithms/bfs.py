@@ -12,7 +12,8 @@ class BFSSolver(SearchAlgorithm):
             print("BFS: Already at win condition!")
             return [initial_state]
 
-        frontier = deque([initial_state])
+        frontier_queue = deque([initial_state])
+        frontier_set = set([initial_state])
         explored: Set[GameState] = set()
         
         # لتخزين أفضل حالة
@@ -28,8 +29,9 @@ class BFSSolver(SearchAlgorithm):
         parent_map = {initial_state: None}
         
         iteration = 0
-        while frontier:
-            state = frontier.popleft()
+        while frontier_queue:
+            state = frontier_queue.popleft()
+            frontier_set.remove(state)
             iteration += 1
             
             if state in explored:
@@ -41,7 +43,7 @@ class BFSSolver(SearchAlgorithm):
 
             # طباعة التقدم
             if iteration % 1000 == 0:
-                print(f"BFS: Nodes explored: {self.nodes_explored}, Frontier: {len(frontier)}")
+                print(f"BFS: Nodes explored: {self.nodes_explored}, Frontier: {len(frontier_queue)}")
 
             if state.check_win_condition():
                 print(f"BFS Solution found! Total nodes explored: {self.nodes_explored}")
@@ -49,6 +51,18 @@ class BFSSolver(SearchAlgorithm):
                 
                 # إضافة طباعة لمسار الحل للتحقق
                 solution_states = self.reconstruct_path(state)
+                
+                # Trim the path to start from the initial_state of the search
+                initial_index = -1
+                for i, s in enumerate(solution_states):
+                    if s == initial_state:
+                        initial_index = i
+                        break
+                if initial_index == -1:
+                    print("Error: initial_state not found in solution path")
+                    return None
+                solution_states = solution_states[initial_index:]
+                
                 print(f"Solution path has {len(solution_states)} states:")
                 for i, sol_state in enumerate(solution_states):
                     block_ids = [block.id for block in sol_state.blocks]
@@ -62,8 +76,8 @@ class BFSSolver(SearchAlgorithm):
             valid_moves = []
             for next_state, action in possible_moves:
                 block_id, dx, dy, distance = action
-                if state.is_move_valid(block_id, (dx, dy), distance):
-                    valid_moves.append((next_state, action))
+                # Remove invalid check since get_possible_moves already filters
+                valid_moves.append((next_state, action))
             
             if iteration <= 3 and valid_moves:  # طباعة أول 3 حركات
                 print(f"BFS: State {iteration} has {len(valid_moves)} valid moves")
@@ -71,9 +85,10 @@ class BFSSolver(SearchAlgorithm):
                     print(f"  Move: {action}, Next blocks: {len(next_state.blocks)}")
             
             for next_state, action in valid_moves:
-                if next_state not in explored and next_state not in frontier:
+                if next_state not in explored and next_state not in frontier_set:
                     parent_map[next_state] = state
-                    frontier.append(next_state)
+                    frontier_set.add(next_state)
+                    frontier_queue.append(next_state)
         
         # إذا وصلنا هنا ولم نجد حل، نعيد أفضل حالة
         print(f"BFS: No solution found. Best state has {len(self.best_state_found.blocks)} blocks remaining.")

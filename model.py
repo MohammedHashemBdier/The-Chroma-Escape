@@ -95,7 +95,7 @@ class Board:
 class GameState:
     def __init__(self, board: Board, blocks: List[Block], parent=None, action=None, depth=0):
         self.board = board
-        self.blocks = blocks 
+        self.blocks = copy.deepcopy(blocks) 
         self.parent = parent
         self.action = action
         self.depth = depth
@@ -222,8 +222,12 @@ class GameState:
         return False
     
     def _is_block_adjacent_to_exit(self, block: Block) -> bool:
-        """تحقق إذا كانت القطعة مجاورة لمخرج من نفس لونها في موقعها الحالي"""
+        """تحقق إذا كانت القطعة مجاورة لمخرج من نفس لونها أو عليه في موقعها الحالي"""
         for x, y in block.get_absolute_coords():
+            if self.board.is_exit_at(x, y):
+                exit_color = self.board.exits[(x, y)].get("color")
+                if exit_color and exit_color.lower() == block.color.lower():
+                    return True
             if self.board.is_adjacent_to_exit(x, y, block.color):
                 return True
         return False
@@ -269,35 +273,48 @@ class GameState:
         
         return score
     
-    def get_keyboard_move(self, direction: str) -> Optional[Tuple[int, Tuple[int, int], int]]:
-        if self.selected_block_index is None or self.selected_block_index >= len(self.blocks):
-            return None
+    def is_move_valid(self, block_id: int, direction: Tuple[int, int], distance: int) -> bool:
+        block = None
+        for b in self.blocks:
+            if b.id == block_id:
+                block = b
+                break
+        if block is None:
+            return False
         
-        block = self.blocks[self.selected_block_index]
+        if block.move_lock > 0:
+            return False
         
-        if direction == "UP":
-            dx, dy = 0, -1
-        elif direction == "DOWN":
-            dx, dy = 0, 1
-        elif direction == "LEFT":
-            dx, dy = -1, 0
-        elif direction == "RIGHT":
-            dx, dy = 1, 0
-        else:
-            return None
+        if not block.can_move(direction):
+            return False
         
-        if not block.can_move((dx, dy)):
-            return None
+        dx, dy = direction
         
-        distance = 1
-        
+        # Allow moves that cause exit, even if invalid otherwise
         if self.board.would_be_adjacent_to_exit_after_move(block, (dx, dy), distance):
-            return (block.id, (dx, dy), distance)
+            return True
         
-        if not self._is_path_clear_for_distance(block, (dx, dy), distance, self.selected_block_index):
-            return None
+        # Check path clear
+        if not self._is_path_clear_for_distance(block, (dx, dy), distance, self.blocks.index(block)):
+            return False
         
-        return (block.id, (dx, dy), distance)
+        # Check new position valid
+        new_coords = set()
+        for shape_dx, shape_dy in block.shape:
+            x = block.x + dx * distance + shape_dx
+            y = block.y + dy * distance + shape_dy
+            if not (0 <= x < self.board.width and 0 <= y < self.board.height):
+                return False
+            if (x, y) in self.board.barriers or (x, y) in self.board.exits:
+                return False
+            new_coords.add((x, y))
+        
+        occupied = self.get_occupied_coords()
+        moving_coords = set(block.get_absolute_coords())
+        if new_coords.intersection(occupied - moving_coords):
+            return False
+        
+        return True
     
     def select_next_block(self, forward: bool = True):
         if not self.blocks:
@@ -398,3 +415,41 @@ class GameState:
             if block.id == block_id:
                 return block
         return None
+    
+    def apply_move(self, block_id: int, direction: Tuple[int, int], distance: int) -> 'GameState':
+        block_index = None
+        for i, b in enumerate(self.blocks):
+            if b.id == block_id:
+                block_index = i
+                break
+        if block_index is None:
+            return self
+        
+        block = self.blocks[block_index]
+        dx, dy = direction
+        
+        if self.board.would_be_adjacent_to_exit_after_move(block, (dx, dy), distance):
+            new_blocks = self.blocks[:]
+            new_blocks.pop(block_index)
+            new_state = GameState(self.board, new_blocks, self, (block_id, dx, dy, distance), self.depth + 1)
+            new_state.move_count = self.move_count + 1
+            new_state.display_lock = self.display_lock.copy()
+            new_state.decrease_all_move_locks()
+            return new_state
+        else:
+            new_block = Block(
+                color=block.color,
+                x=block.x + dx * distance,
+                y=block.y + dy * distance,
+                shape=block.shape,
+                movement_type=block.movement_type,
+                id=block.id,
+                move_lock=block.move_lock
+            )
+            new_blocks = self.blocks[:]
+            new_blocks[block_index] = new_block
+            new_state = GameState(self.board, new_blocks, self, (block_id, dx, dy, distance), self.depth + 1)
+            new_state.move_count = self.move_count + 1
+            new_state.display_lock = self.display_lock.copy()
+            new_state.decrease_all_move_locks()
+            return new_state
