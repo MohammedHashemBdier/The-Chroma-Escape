@@ -125,11 +125,9 @@ class GameState:
             if block.move_lock > 0:
                 continue
 
-            # التحقق إذا كانت القطعة مجاورة لمخرج من نفس لونها في مكانها الحالي
             if self._is_block_adjacent_to_exit(block):
-                # حركة خروج دون تحريك القطعة (مسافة 0)
                 action_tuple = (block.id, 0, 0, 0)
-                new_blocks = self.blocks[:]  # استخدام slicing بدلاً من deepcopy
+                new_blocks = self.blocks[:]  
                 new_blocks.pop(block_index)
                 new_state = GameState(self.board, new_blocks, self, action_tuple, self.depth + 1)
                 new_state.move_count = self.move_count + 1
@@ -145,11 +143,9 @@ class GameState:
                 directions.extend([(0, 1), (0, -1)])
             
             for dx, dy in directions:
-                # المسافة هي دائماً 1 لحركة الـAI
                 distance = 1
                 action_tuple = (block.id, dx, dy, distance)
                 
-                # التحقق إذا كانت الحركة ستجعل القطعة مجاورة للمخرج
                 if self.board.would_be_adjacent_to_exit_after_move(block, (dx, dy), distance):
                     new_blocks = self.blocks[:]
                     new_blocks.pop(block_index)
@@ -160,9 +156,7 @@ class GameState:
                     possible_moves.append((new_state, action_tuple))
                     continue
                     
-                # التحقق إذا كان المسار خالياً لمسافة واحدة فقط
                 if self._is_path_clear_for_distance(block, (dx, dy), distance, block_index):
-                    # إنشاء كائن Block جديد بدون deepcopy
                     new_block = Block(
                         color=block.color,
                         x=block.x + dx * distance,
@@ -188,7 +182,6 @@ class GameState:
         moving_block_coords = set(block.get_absolute_coords())
         occupied -= moving_block_coords
         
-        # التحقق فقط لمسافة واحدة (distance = 1)
         for step in range(1, distance + 1):
             for shape_dx, shape_dy in block.shape:
                 x = block.x + dx * step + shape_dx
@@ -222,7 +215,6 @@ class GameState:
         return False
     
     def _is_block_adjacent_to_exit(self, block: Block) -> bool:
-        """تحقق إذا كانت القطعة مجاورة لمخرج من نفس لونها أو عليه في موقعها الحالي"""
         occupied = self.get_occupied_coords()
         for x, y in block.get_absolute_coords():
             if self.board.is_exit_at(x, y):
@@ -230,7 +222,6 @@ class GameState:
                 if exit_color and exit_color.lower() == block.color.lower():
                     return True
             if self.board.is_adjacent_to_exit(x, y, block.color):
-                # تحقق إذا كان المنفذ فارغ
                 exit_pos = None
                 for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
                     ex, ey = x + dx, y + dy
@@ -301,15 +292,12 @@ class GameState:
         
         dx, dy = direction
         
-        # Check path clear
         if not self._is_path_clear_for_distance(block, (dx, dy), distance, self.blocks.index(block)):
             return False
         
-        # Allow moves that cause exit, even if invalid otherwise
         if self.board.would_be_adjacent_to_exit_after_move(block, (dx, dy), distance):
             return True
         
-        # Check new position valid
         new_coords = set()
         for shape_dx, shape_dy in block.shape:
             x = block.x + dx * distance + shape_dx
@@ -382,11 +370,9 @@ class GameState:
                     self.display_lock[block.color] = min(self.display_lock[block.color], block.move_lock)
 
     def is_move_valid(self, block_id: int, direction: Tuple[int, int], distance: int) -> bool:
-        """تحقق إذا كانت الحركة صالحة في الحالة الحالية."""
         if distance not in [0, 1]:
             return False
         
-        # البحث عن القطعة
         block_index = -1
         for i, block in enumerate(self.blocks):
             if block.id == block_id:
@@ -394,34 +380,28 @@ class GameState:
                 break
         
         if block_index == -1:
-            # القطعة غير موجودة - ربما خرجت سابقاً
             return False
         
         block = self.blocks[block_index]
         
-        # حركة خروج مباشرة
         if distance == 0 and direction == (0, 0):
             return self._is_block_adjacent_to_exit(block)
         
-        # تحقق من قفل الحركة
         if block.move_lock > 0:
             return False
         
         dx, dy = direction
         
-        # تحقق من نوع الحركة
         if (dx != 0 and block.movement_type == MovementType.VERTICAL) or \
            (dy != 0 and block.movement_type == MovementType.HORIZONTAL):
             return False
         
-        # تحقق من حدود اللوحة والمسار
         if not self._is_path_clear_for_distance(block, (dx, dy), distance, block_index):
             return False
         
         return True
     
     def get_block_by_id(self, block_id: int) -> Optional[Block]:
-        """الحصول على قطعة بواسطة الـ ID."""
         for block in self.blocks:
             if block.id == block_id:
                 return block

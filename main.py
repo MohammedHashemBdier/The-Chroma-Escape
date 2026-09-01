@@ -9,9 +9,9 @@ from search_algorithms.astar import AStarSolver
 from search_algorithms.bfs import BFSSolver
 from search_algorithms.dfs import DFSSolver
 from search_algorithms.dfs_recursive import DFSRecursiveSolver
+from search_algorithms.hillclimbing import HillClimbingSolver
 from search_algorithms.ucs import UCSSolver
 from search_algorithms.greedy import GreedySolver
-from search_algorithms.astar import AStarSolver
 from view import GameVisualizer
 from sound_manager import SoundManager
 
@@ -54,40 +54,83 @@ def extract_moves_from_solution_path(solution_path, current_state):
     
     # البحث عن الحالة الحالية في مسار الحل
     current_state_key = current_state.get_hashable_key()
-    start_index = 0
+    start_index = -1
     
+    # البحث عن أقرب حالة مطابقة
     for i, state in enumerate(solution_path):
+        # أولاً: تحقق إذا كانت الحالة مطابقة تماماً
         if state.get_hashable_key() == current_state_key:
             start_index = i
             break
     
-    # إذا لم نجد الحالة الحالية، نبدأ من البداية
-    # لكننا نطبع تحذير
-    if start_index == 0 and current_state_key != solution_path[0].get_hashable_key():
+    # إذا لم نجد مطابقة تامة، نبحث عن حالة متشابهة (نفس القطع في نفس المواقع)
+    if start_index == -1:
+        for i, state in enumerate(solution_path):
+            if len(state.blocks) == len(current_state.blocks):
+                # تحقق إذا كانت جميع القطع في نفس المواقع
+                match = True
+                blocks_matched = 0
+                for state_block in state.blocks:
+                    # ابحث عن القطعة في الحالة الحالية
+                    found = False
+                    for current_block in current_state.blocks:
+                        if (current_block.id == state_block.id and 
+                            current_block.x == state_block.x and 
+                            current_block.y == state_block.y):
+                            found = True
+                            blocks_matched += 1
+                            break
+                    if not found:
+                        match = False
+                        break
+                
+                if match and blocks_matched == len(state.blocks):
+                    start_index = i
+                    break
+    
+    # إذا لم نجد أي مطابقة، نبدأ من بداية المسار
+    if start_index == -1:
         print(f"Warning: Current state not found in solution path!")
-        print(f"Current state: {len(current_state.blocks)} blocks, IDs: {[block.id for block in current_state.blocks]}")
-        print(f"First state in path: {len(solution_path[0].blocks)} blocks, IDs: {[block.id for block in solution_path[0].blocks]}")
-        return []
+        print(f"Current: {len(current_state.blocks)} blocks, IDs: {sorted([b.id for b in current_state.blocks])}")
+        print(f"Path states: {[len(s.blocks) for s in solution_path[:5]]} blocks")
+        start_index = 0
     
-    # نبدأ من الحالة التالية للحالة الحالية
+    # استخراج الحركات من هذه النقطة
     moves = []
-    for i in range(start_index + 1, len(solution_path)):
+    for i in range(start_index, len(solution_path) - 1):
         state = solution_path[i]
-        if state.action is not None:
-            moves.append(state.action)
+        next_state = solution_path[i + 1]
+        
+        if next_state.action is not None:
+            moves.append(next_state.action)
     
-    # التحقق من أن الحركات متسلسلة ومتتابعة
-    valid_moves = moves
-    
-    print(f"Extracted {len(valid_moves)} moves from solution path")
-    return valid_moves
+    print(f"Extracted {len(moves)} moves from solution path (starting from index {start_index})")
+    return moves
 
-def run_game(level_index=0, algorithm_name="A*"):
+def get_algorithm_for_level(level_index):
+    """اختر أفضل خوارزمية حسب مستوى الصعوبة."""
+    # مستوى 1 (الكبير): A* أو Greedy
+    if level_index == 0:
+        return "A*"
+    # مستوى 2 (المتوسط): BFS أو A*
+    elif level_index == 1:
+        return "BFS"
+    # مستوى 3 و4 (الصغير): BFS (أسرع)
+    else:
+        return "BFS"
+
+def run_game(level_index=0, algorithm_name=None):
     try:
         current_level = level_index % len(LEVEL_FILES)
         LEVEL_FILE = LEVEL_FILES[current_level]
         
+        # اختيار الخوارزمية المناسبة إذا لم تحدد
+        if algorithm_name is None:
+            algorithm_name = get_algorithm_for_level(current_level)
+        
         print(f"Loading level: {LEVEL_FILE}")
+        print(f"Selected algorithm: {algorithm_name}")
+        
         initial_state = load_game_state(LEVEL_FILE)
         
         if initial_state is None:
@@ -115,6 +158,8 @@ def run_game(level_index=0, algorithm_name="A*"):
         ai_solution_path = []
         ai_move_delay = 500  # سرعة الحركة بالمللي ثانية
         last_ai_move_time = 0
+        ai_replan_count = 0
+        max_replan_attempts = 3
         
         # تعريف الخوارزمية حسب الاختيار
         algorithm_map = {
@@ -122,6 +167,7 @@ def run_game(level_index=0, algorithm_name="A*"):
             "DFS": DFSSolver,
             "DFS_Recursive": DFSRecursiveSolver,
             "UCS": UCSSolver,
+            "Hill_Climbing": HillClimbingSolver,
             "Greedy": GreedySolver,
             "A*": AStarSolver
         }
@@ -140,23 +186,29 @@ def run_game(level_index=0, algorithm_name="A*"):
 
             if is_ai_playing and ai_solution_path:
                 if current_time - last_ai_move_time > ai_move_delay:
+                    # محاولة تنفيذ الحركة الحالية
                     if len(ai_solution_path) > 0:
-                        action = ai_solution_path[0]  # ننظر إلى الحركة التالية دون إزالتها
+                        action = ai_solution_path[0]
                         block_id, dx, dy, distance = action
                         
                         print(f"\nAI attempting move {len(ai_solution_path)}: {action}")
                         
-                        # التحقق من صحة الحركة قبل التنفيذ
+                        # التحقق من صحة الحركة
                         if not current_state.is_move_valid(block_id, (dx, dy), distance):
                             print(f"Move {action} is no longer valid! Skipping.")
                             ai_solution_path.pop(0)  # إزالة الحركة غير الصالحة
-                            message = f"AI skipped invalid move: {action}"
+                            message = f"AI skipped invalid move"
+                            
+                            # إذا أصبحت القائمة فارغة، توقف
+                            if not ai_solution_path:
+                                is_ai_playing = False
+                                message = "AI: Path completed (some moves skipped)"
                         else:
                             # تنفيذ الحركة
                             new_state, status = logic.try_move_manual(current_state, block_id, (dx, dy), distance)
                             
                             if status in [MOVE_SUCCESS, MOVE_EXIT]:
-                                # نجاح الحركة، ننتقل للحركة التالية
+                                # نجاح الحركة
                                 current_state = new_state
                                 move_count += 1
                                 ai_solution_path.pop(0)  # إزالة الحركة المنفذة
@@ -164,14 +216,15 @@ def run_game(level_index=0, algorithm_name="A*"):
                                 if status == MOVE_SUCCESS:
                                     sound_manager.play_move()
                                     print(f"Move successful. Remaining moves: {len(ai_solution_path)}")
+                                    message = f"AI moved block {block_id}"
                                 else:
                                     sound_manager.play_exit()
                                     print(f"Exit successful. Remaining moves: {len(ai_solution_path)}")
+                                    message = f"AI exited block {block_id}"
                             else:
-                                print(f"Move execution failed unexpectedly. Stopping AI.")
-                                is_ai_playing = False
-                                message = f"AI stopped: Move execution failed"
-                                ai_solution_path = []
+                                print(f"Move execution failed. Skipping.")
+                                ai_solution_path.pop(0)
+                                message = f"AI: Move execution failed"
                     
                     last_ai_move_time = current_time
 
@@ -183,31 +236,10 @@ def run_game(level_index=0, algorithm_name="A*"):
                             sound_manager.play_win()
                             print("Puzzle solved by AI!")
                         else:
-                            if 'replan_count' not in globals():
-                                replan_count = 0
-                            replan_count += 1
-                            if replan_count > 1:
-                                message = "AI stuck, stopped re-planning"
-                                print("AI stuck after 1 re-plan")
-                            else:
-                                print(f"AI path completed but puzzle not solved (attempt {replan_count}). Re-planning...")
-                                print(f"Current state: {len(current_state.blocks)} blocks, IDs: {[block.id for block in current_state.blocks]}")
-                                ai_solver = ai_solver_class()
-                                start_time = time.time()
-                                new_solution_path = ai_solver.solve(current_state)
-                                end_time = time.time()
-                                solve_time = end_time - start_time
-                                if new_solution_path:
-                                    print(f"New solution found in {solve_time:.2f} seconds, {ai_solver.nodes_explored} nodes")
-                                    ai_solution_path = extract_moves_from_solution_path(new_solution_path, current_state)
-                                    print(f"New path has {len(ai_solution_path)} moves")
-                                    if ai_solution_path:
-                                        is_ai_playing = True
-                                        last_ai_move_time = current_time
-                                    else:
-                                        message = "No valid moves in new path"
-                                else:
-                                    message = "No new solution found"
+                            # لا تقم بإعادة التخطيط تلقائياً
+                            message = f"AI finished path. Press S to re-plan."
+                            print("AI path completed but puzzle not solved.")
+                            print(f"Current state: {len(current_state.blocks)} blocks remaining")
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -225,18 +257,18 @@ def run_game(level_index=0, algorithm_name="A*"):
                             message = "AI stopped."
                             print("AI stopped by user.")
                         else:
-                            # بدء الـ AI من الحالة الحالية فقط
+                            # بدء الـ AI من الحالة الحالية
                             message = f"{algorithm_name} is solving from current state..."
                             viz.draw(current_state, move_count=move_count, message=message)
                             pygame.display.flip()
 
                             # استخدام الخوارزمية المحددة
                             print(f"\n{'='*50}")
-                            print(f"Starting AI solver ({ai_solver.name}) from CURRENT state...")
+                            print(f"Starting AI solver ({algorithm_name}) from CURRENT state...")
                             print(f"Current state has {len(current_state.blocks)} blocks")
                             print(f"Blocks IDs: {[block.id for block in current_state.blocks]}")
                             
-                            # إعادة تهيئة الخوارزمية لحل من الحالة الحالية فقط
+                            # إعادة تهيئة الخوارزمية
                             ai_solver = ai_solver_class()
                             start_time = time.time()
                             solution_path = ai_solver.solve(current_state)
@@ -247,7 +279,6 @@ def run_game(level_index=0, algorithm_name="A*"):
                                 print(f"Found solution path with {len(solution_path)} states")
                                 print(f"Time taken: {solve_time:.2f} seconds")
                                 print(f"Nodes explored: {ai_solver.nodes_explored}")
-                                print(f"Moves to solution: {len(solution_path) - 1}")
                                 
                                 # استخراج الحركات الصالحة من الحل
                                 ai_solution_path = extract_moves_from_solution_path(solution_path, current_state)
@@ -258,7 +289,7 @@ def run_game(level_index=0, algorithm_name="A*"):
                                     for i, action in enumerate(ai_solution_path[:5]):
                                         print(f"  Move {i+1}: {action}")
                                     
-                                    # التحقق من أن الحركة الأولى صالحة في الحالة الحالية
+                                    # التحقق من أن الحركة الأولى صالحة
                                     if ai_solution_path:
                                         first_action = ai_solution_path[0]
                                         block_id, dx, dy, distance = first_action
@@ -266,27 +297,29 @@ def run_game(level_index=0, algorithm_name="A*"):
                                         if current_state.is_move_valid(block_id, (dx, dy), distance):
                                             is_ai_playing = True
                                             last_ai_move_time = 0
+                                            ai_replan_count = 0
                                             
                                             if solution_path[-1].check_win_condition():
-                                                message = f"AI found solution in {len(ai_solution_path)} moves! Now playing..."
+                                                message = f"AI found solution in {len(ai_solution_path)} moves!"
                                                 print(f"Complete solution found! {len(ai_solution_path)} moves to win.")
                                             else:
-                                                message = f"AI found best path ({len(ai_solution_path)} moves) to improve state."
-                                                print(f"Best path found. Target has {len(solution_path[-1].blocks)} blocks.")
+                                                message = f"AI found path to improve state ({len(ai_solution_path)} moves)"
+                                                print(f"Improvement path found. Target has {len(solution_path[-1].blocks)} blocks.")
                                         else:
-                                            message = f"Error: First move {first_action} is not valid."
+                                            message = f"Error: First move is not valid."
                                             print(f"ERROR: First move is invalid in current state!")
+                                            ai_solution_path = []
                                 else:
-                                    message = f"{algorithm_name}: No valid moves found in solution."
+                                    message = f"{algorithm_name}: No valid moves found."
                                     print("No valid moves could be extracted from solution.")
                             else:
-                                message = f"{algorithm_name}: No solution found from current state."
+                                message = f"{algorithm_name}: No solution found."
                                 print("No solution found from current state.")
                                 print(f"Time taken: {solve_time:.2f} seconds")
                                 print(f"Nodes explored: {ai_solver.nodes_explored}")
+                            
                             print(f"{'='*50}\n")
                         
-                        pygame.time.set_timer(pygame.USEREVENT + 1, 3000)
                         continue
 
                     if is_ai_playing:
@@ -394,7 +427,7 @@ def run_game(level_index=0, algorithm_name="A*"):
                             direction_vector = (0, 1 if total_dy > 0 else -1)
                             distance = abs(total_dy)
                         
-                        if distance > 0:
+                        if distance > 0 and distance <= 1:  # سماح فقط بمسافة 1
                             new_state, status = logic.try_move_manual(
                                 current_state, 
                                 selected_block_id, 
@@ -449,7 +482,6 @@ def run_game(level_index=0, algorithm_name="A*"):
         show_error_screen(screen, font, traceback.format_exc())
         pygame.quit()
 
-
 def show_level_selection():
     try:
         pygame.init()
@@ -466,9 +498,13 @@ def show_level_selection():
             small_font = pygame.font.SysFont(None, 24)
             medium_font = pygame.font.SysFont(None, 20)
         
-        algorithms = ["BFS", "DFS", "DFS_Recursive", "UCS", "Greedy", "A*"]
+        algorithms = ["BFS", "DFS", "DFS_Recursive", "UCS", "Greedy", "A*","Hill_Climbing",
+]
         selected_algorithm = 0
         selected_level = 0
+        
+        # اقتراح أفضل خوارزمية لكل مستوى
+        algorithm_suggestions = ["A*", "BFS", "BFS", "BFS"]
         
         running = True
         while running:
@@ -487,6 +523,11 @@ def show_level_selection():
                 color = (0, 100, 0) if i == selected_level else (0, 0, 0)
                 level_display = small_font.render(f"{i+1}. {level_name}", True, color)
                 screen.blit(level_display, (70, 130 + i * 30))
+                
+                # عرض الخوارزمية المقترحة
+                suggested = algorithm_suggestions[i]
+                suggestion_text = small_font.render(f"Suggested: {suggested}", True, (100, 100, 100))
+                screen.blit(suggestion_text, (200, 130 + i * 30))
             
             # عرض خوارزميات البحث
             algo_text = medium_font.render("Select Algorithm:", True, (0, 0, 0))
@@ -499,7 +540,8 @@ def show_level_selection():
             
             # تعليمات
             instructions = [
-                "UP/DOWN: Navigate",
+                "UP/DOWN: Navigate levels",
+                "LEFT/RIGHT: Navigate algorithms",
                 "ENTER: Start Game",
                 "ESC: Quit"
             ]
@@ -507,6 +549,11 @@ def show_level_selection():
             for i, instruction in enumerate(instructions):
                 inst_text = small_font.render(instruction, True, (100, 100, 100))
                 screen.blit(inst_text, (400, 300 + i * 25))
+            
+            # عرض الخوارزمية المقترحة للمستوى المختار
+            suggested_algo = algorithm_suggestions[selected_level]
+            suggestion_text = font.render(f"Suggested for this level: {suggested_algo}", True, (0, 100, 0))
+            screen.blit(suggestion_text, (400, 200))
             
             pygame.display.flip()
             
@@ -540,7 +587,6 @@ def show_level_selection():
         font = pygame.font.SysFont("consolas", 18)
         show_error_screen(screen, font, traceback.format_exc())
         pygame.quit()
-
 
 if __name__ == '__main__':
     show_level_selection()

@@ -1,0 +1,9 @@
+# Python Gitignore
+__pycache__/
+*.py[cod]
+*$py.class
+.vscode/
+venv/
+env/
+.pytest_cache/
+.DS_Store

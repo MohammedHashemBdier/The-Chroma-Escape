@@ -67,17 +67,14 @@ class GameLogic:
         print("\n" + "="*50)
 
     def try_move_manual(self, current_state: GameState, block_id: int, direction_vector: tuple, distance: int) -> tuple:
-        # التحقق الأساسي
         if distance not in [0, 1]:
             print(f"Error: Invalid distance {distance}. Must be 0 or 1.")
             return (current_state, MOVE_INVALID)
         
-        # التحقق من صحة الحركة في الحالة الحالية
         if not current_state.is_move_valid(block_id, direction_vector, distance):
             print(f"Error: Move ({block_id}, {direction_vector}, {distance}) is not valid in current state")
             return (current_state, MOVE_INVALID)
         
-        # البحث عن القطعة
         block_index = -1
         for i, block in enumerate(current_state.blocks):
             if block.id == block_id:
@@ -90,23 +87,19 @@ class GameLogic:
         block = current_state.blocks[block_index]
         dx, dy = direction_vector
         
-        # حركة خروج مباشرة
         if distance == 0 and dx == 0 and dy == 0:
             action_tuple = (block_id, 0, 0, 0)
             new_state = self._create_new_state_after_exit(current_state, block_index, action_tuple)
             self.move_history.append((current_state, action_tuple))
             return (new_state, MOVE_EXIT)
         
-        # حركة عادية
         action_tuple = (block_id, dx, dy, distance)
 
-        # إذا كانت الحركة ستجعل القطعة مجاورة للمخرج
         if current_state.board.would_be_adjacent_to_exit_after_move(block, (dx, dy), distance):
             new_state = self._create_new_state_after_exit(current_state, block_index, action_tuple)
             self.move_history.append((current_state, action_tuple))
             return (new_state, MOVE_EXIT)
 
-        # حركة عادية بدون خروج
         final_x = block.x + dx * distance
         final_y = block.y + dy * distance
         

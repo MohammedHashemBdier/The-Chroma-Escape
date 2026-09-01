@@ -16,7 +16,6 @@ class UCSSolver(SearchAlgorithm):
         explored: Set[GameState] = set()
         counter = 1
         
-        # تحديث أفضل حالة بالحالة الأولية
         self.best_state_found = initial_state
         self.best_score = self._evaluate_state(initial_state)
         
@@ -30,7 +29,6 @@ class UCSSolver(SearchAlgorithm):
                 continue
             explored.add(state)
 
-            # تحديث أفضل حالة
             self._update_best_state(state)
 
             if self.nodes_explored % 1000 == 0:
@@ -46,11 +44,9 @@ class UCSSolver(SearchAlgorithm):
                     heapq.heappush(frontier, (new_cost, counter, next_state))
                     counter += 1
         
-        # إذا وصلنا هنا ولم نجد حل، نعيد أفضل حالة
         print(f"UCS: No solution found. Best state has {len(self.best_state_found.blocks)} blocks remaining.")
         print(f"Total nodes explored: {self.nodes_explored}")
         
-        # إذا كانت أفضل حالة لم تقلل عدد القطع، نعيد الحالة الأولية
         if len(self.best_state_found.blocks) >= len(initial_state.blocks):
             return [initial_state]
         
